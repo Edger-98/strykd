@@ -19,5 +19,12 @@ class Goal(Base):
     end_date: Mapped[date] = mapped_column(Date, nullable=False)
     status: Mapped[str] = mapped_column(String, default="active")  # active, completed, paused
 
+    # Rich onboarding context (also fed to the LLM at generation time)
+    life_area: Mapped[str | None] = mapped_column(String, nullable=True)  # career/fitness/business/creative/personal-growth
+    why_now: Mapped[str | None] = mapped_column(Text, nullable=True)
+    past_blockers: Mapped[str | None] = mapped_column(Text, nullable=True)
+    hours_per_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    daily_rhythm: Mapped[str | None] = mapped_column(String, nullable=True)  # morning | evening
+
     user: Mapped["User"] = relationship("User", back_populates="goals")
     tasks: Mapped[list["DailyTask"]] = relationship("DailyTask", back_populates="goal", cascade="all, delete-orphan")

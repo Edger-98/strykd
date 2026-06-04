@@ -16,8 +16,20 @@ def _get_client() -> anthropic.AsyncAnthropic:
 
 # Stable system prompt — cached at the breakpoint so per-user prompts share it.
 _SYSTEM_PROMPT = """\
-You are a world-class productivity coach and creative director who builds personalized \
+You are a world-class productivity coach and creative director who builds deeply personalized \
 accountability systems. You generate precise daily plans and distinctive visual identities.
+
+You will be given rich context about a person: their life area, the goal itself, why this \
+matters to them *right now*, what has blocked them in the past, how many focused hours they \
+have each day, and whether they operate best in the morning or evening. Use ALL of it:
+
+- Tailor task TIMING and load to their available hours and daily rhythm (front-load the hard \
+  work into their peak window; never schedule more than their stated hours can hold).
+- Directly counter the SPECIFIC blockers they named — design tasks and a voice that defuse \
+  those exact failure modes, don't just give generic advice.
+- Let their "why now" set the emotional register of the mission statement, headlines, and \
+  signal wall — this is the fuel; make them feel it.
+- Match the visual theme to the life area and the energy of their reason for starting.
 
 Return ONLY a single valid JSON object. No markdown fences, no code blocks, no preamble, \
 no explanation. Your response must start with { and end with }.
@@ -55,9 +67,29 @@ Rules:
 """
 
 
-async def generate_plan(goals: str, duration_days: int, aesthetic: str) -> dict:
+async def generate_plan(
+    goals: str,
+    duration_days: int,
+    aesthetic: str,
+    life_area: str | None = None,
+    why_now: str | None = None,
+    past_blockers: str | None = None,
+    hours_per_day: int | None = None,
+    daily_rhythm: str | None = None,
+) -> dict:
     client = _get_client()
     num_weeks = (duration_days + 6) // 7
+
+    context_lines = [
+        f"Life area: {life_area or 'unspecified'}",
+        f"The goal: {goals}",
+        f"Why now (their urgency): {why_now or 'unspecified'}",
+        f"What has blocked them before: {past_blockers or 'unspecified'}",
+        f"Focused hours available per day: {hours_per_day if hours_per_day is not None else 'unspecified'}",
+        f"Daily rhythm: {daily_rhythm or 'unspecified'} person",
+        f"Aesthetic preference: {aesthetic}",
+        f"Duration: {duration_days} days ({num_weeks} weeks)",
+    ]
 
     response = await client.messages.create(
         model="claude-sonnet-4-6",
@@ -73,12 +105,14 @@ async def generate_plan(goals: str, duration_days: int, aesthetic: str) -> dict:
             {
                 "role": "user",
                 "content": (
-                    f"Generate a complete accountability plan.\n\n"
-                    f"Goals: {goals}\n"
-                    f"Duration: {duration_days} days ({num_weeks} weeks)\n"
-                    f"Aesthetic preference: {aesthetic}\n\n"
-                    f"Requirements:\n"
+                    "Generate a complete, deeply personalized accountability plan for this person.\n\n"
+                    "=== CONTEXT ===\n"
+                    + "\n".join(context_lines)
+                    + "\n\n=== REQUIREMENTS ===\n"
                     f"- daily_tasks: exactly {duration_days} entries (day 1 through day {duration_days}), 5 tasks each\n"
+                    f"- Respect their {hours_per_day if hours_per_day is not None else 'available'} hours/day — do not over-schedule\n"
+                    f"- Schedule the heaviest tasks in their {daily_rhythm or 'peak'} window\n"
+                    f"- Tasks must actively counter the blockers they named\n"
                     f"- chapter_titles: exactly {num_weeks} entries\n"
                     f"- Return only the JSON object, nothing else."
                 ),

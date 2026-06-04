@@ -57,6 +57,7 @@ async def _build_public_data(slug: str, db: AsyncSession) -> dict:
             "name": user.name,
             "slug": user.slug,
             "streak_days": user.streak_days,
+            "page_public": user.page_public,
         },
         "theme": {
             "color_palette": theme.color_palette,
@@ -107,6 +108,10 @@ async def public_page(slug: str, db: AsyncSession = Depends(get_db)):
 
     data = await _build_public_data(slug, db)
     if not data:
+        raise HTTPException(status_code=404, detail="Page not found")
+
+    # Respect the public/private toggle — private pages 404 to anonymous visitors
+    if not data["user"].get("page_public", True):
         raise HTTPException(status_code=404, detail="Page not found")
 
     await set_public_page(slug, data, ttl=600)

@@ -19,6 +19,7 @@ class User(Base):
     streak_days: Mapped[int] = mapped_column(Integer, default=0)
     last_checkin: Mapped[date | None] = mapped_column(Date, nullable=True)
     subscription_active: Mapped[bool] = mapped_column(Boolean, default=False)
+    page_public: Mapped[bool] = mapped_column(Boolean, default=True)  # public/private page toggle
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     goals: Mapped[list["Goal"]] = relationship("Goal", back_populates="user", cascade="all, delete-orphan")

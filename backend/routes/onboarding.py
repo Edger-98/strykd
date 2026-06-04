@@ -21,6 +21,12 @@ class OnboardingRequest(BaseModel):
     goals: str
     duration_days: int
     aesthetic: str  # e.g. "dark-ember", "arctic-focus", "soft-earth"
+    life_area: str  # career | fitness | business | creative | personal-growth
+    why_now: str
+    past_blockers: str
+    hours_per_day: int
+    daily_rhythm: str  # morning | evening
+    page_public: bool = True  # public or private page
 
 
 class OnboardingResponse(BaseModel):
@@ -44,12 +50,17 @@ async def onboard(
     if body.duration_days < 1 or body.duration_days > 365:
         raise HTTPException(status_code=422, detail="duration_days must be between 1 and 365")
 
-    # Generate full plan via LLM
+    # Generate full plan via LLM, using the full personalization context
     try:
         plan = await generate_plan(
             goals=body.goals,
             duration_days=body.duration_days,
             aesthetic=body.aesthetic,
+            life_area=body.life_area,
+            why_now=body.why_now,
+            past_blockers=body.past_blockers,
+            hours_per_day=body.hours_per_day,
+            daily_rhythm=body.daily_rhythm,
         )
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Plan generation failed: {exc}")
@@ -57,7 +68,10 @@ async def onboard(
     today = date.today()
     end_date = today + timedelta(days=body.duration_days - 1)
 
-    # Persist Goal
+    # Honor the public/private page toggle
+    current_user.page_public = body.page_public
+
+    # Persist Goal with the full onboarding context
     goal = Goal(
         user_id=current_user.id,
         description=body.goals,
@@ -65,6 +79,11 @@ async def onboard(
         start_date=today,
         end_date=end_date,
         status="active",
+        life_area=body.life_area,
+        why_now=body.why_now,
+        past_blockers=body.past_blockers,
+        hours_per_day=body.hours_per_day,
+        daily_rhythm=body.daily_rhythm,
     )
     db.add(goal)
     await db.flush()  # populate goal.id before FK refs
