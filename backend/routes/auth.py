@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config import settings
 from database import get_db
 from models.user import User
+from services.email import send_welcome_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -63,6 +64,10 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     db.add(user)
     await db.commit()
     await db.refresh(user)
+
+    # Welcome email — best-effort, never blocks registration
+    await send_welcome_email(user.email, user.name)
+
     return TokenResponse(access_token=_create_token(str(user.id)))
 
 

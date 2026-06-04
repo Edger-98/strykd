@@ -202,10 +202,13 @@ export default function Onboarding() {
               </button>
             )}
             <button className="pill pill-red" onClick={advance} style={{ marginLeft: 'auto' }}>
-              {isLast ? 'Launch my plan' : 'Continue'} <ArrowRight size={17} />
+              {isLast ? 'Start your free week' : 'Continue'} <ArrowRight size={17} />
             </button>
           </div>
 
+          {isLast && (
+            <p style={S.trial}>No charge for 7 days. Cancel anytime.</p>
+          )}
           {cur.text && <p style={S.hint}>Press ⌘/Ctrl + Enter to continue</p>}
         </div>
       </div>
@@ -261,5 +264,6 @@ const S = {
   textarea: { minHeight: 140, resize: 'vertical', lineHeight: 1.5 },
   err: { color: 'var(--red)', fontSize: '0.88rem', marginTop: '1rem' },
   nav: { display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '2.5rem' },
+  trial: { color: 'var(--text-dim)', fontSize: '0.82rem', marginTop: '1rem', textAlign: 'right' },
   hint: { color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: '1rem' },
 }

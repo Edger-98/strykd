@@ -23,8 +23,12 @@ async def create_checkout_session(user_id: str, email: str, customer_id: str | N
         # client_reference_id lets the webhook map the session back to our user
         "client_reference_id": user_id,
         "metadata": {"user_id": user_id},
-        # carry the user_id onto the subscription too, so subscription.* events have it
-        "subscription_data": {"metadata": {"user_id": user_id}},
+        # 7-day free trial before the first $9 charge; carry user_id onto the
+        # subscription so subscription.* / trial_will_end events have it.
+        "subscription_data": {
+            "trial_period_days": 7,
+            "metadata": {"user_id": user_id},
+        },
     }
     if customer_id:
         params["customer"] = customer_id

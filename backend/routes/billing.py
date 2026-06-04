@@ -10,6 +10,7 @@ from deps import get_current_user
 from models.billing import Billing
 from models.user import User
 from services import stripe as stripe_service
+from services.email import send_trial_ending_email
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
@@ -129,6 +130,12 @@ async def stripe_webhook(
             await _upsert_billing(db, user.id, status="past_due")
             user.subscription_active = False
             await db.commit()
+
+    elif etype == "customer.subscription.trial_will_end":
+        # Stripe fires this 3 days before the trial ends (i.e. before first charge)
+        user = await _user_from_event_object(db, obj)
+        if user:
+            await send_trial_ending_email(user.email, user.name)
 
     # Acknowledge all other events without action
     return {"received": True}
