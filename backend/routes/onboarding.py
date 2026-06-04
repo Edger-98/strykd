@@ -41,11 +41,9 @@ async def onboard(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if not current_user.subscription_active:
-        raise HTTPException(
-            status_code=402,
-            detail="Active subscription required. Complete checkout to unlock your plan.",
-        )
+    # No subscription gate here: onboarding (and plan generation) happens BEFORE
+    # the user starts their 7-day free trial via Stripe checkout. The trial-first
+    # flow is: onboard -> POST /billing/checkout -> Stripe -> subscription active.
 
     if body.duration_days < 1 or body.duration_days > 365:
         raise HTTPException(status_code=422, detail="duration_days must be between 1 and 365")

@@ -161,8 +161,13 @@ export default function Onboarding() {
   const submit = async () => {
     setBusy(true); setError('')
     try {
+      // 1. Save the onboarding data + generate the personalized plan
       await api.onboard({ ...form, duration_days: Number(form.duration_days), hours_per_day: Number(form.hours_per_day) })
-      nav('/dashboard')
+      // 2. Create a Stripe Checkout session for the 7-day free trial
+      const { checkout_url } = await api.checkout()
+      if (!checkout_url) throw new Error('Could not start checkout. Please try again.')
+      // 3. Redirect to Stripe (leaves the SPA; resolves back to FRONTEND_URL on success)
+      window.location.href = checkout_url
     } catch (err) { setError(err.message); setBusy(false) }
   }
 

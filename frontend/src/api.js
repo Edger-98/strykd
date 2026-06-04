@@ -33,6 +33,9 @@ export const api = {
 
   onboard: body => req('POST', '/onboarding', body),
 
+  // Creates a Stripe Checkout session (7-day trial); returns { checkout_url }
+  checkout: () => req('POST', '/billing/checkout'),
+
   replanConfirm: body => req('POST', '/replan/confirm', body),
 
   // Returns the raw Response for streaming
