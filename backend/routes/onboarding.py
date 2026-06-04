@@ -35,9 +35,11 @@ async def onboard(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # TODO Day 2: enforce subscription once Stripe is wired
-    # if not current_user.subscription_active:
-    #     raise HTTPException(status_code=402, detail="Active subscription required")
+    if not current_user.subscription_active:
+        raise HTTPException(
+            status_code=402,
+            detail="Active subscription required. Complete checkout to unlock your plan.",
+        )
 
     if body.duration_days < 1 or body.duration_days > 365:
         raise HTTPException(status_code=422, detail="duration_days must be between 1 and 365")
