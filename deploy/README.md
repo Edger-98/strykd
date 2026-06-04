@@ -1,5 +1,43 @@
 # Strykd — Production Deployment
 
+## Current state
+
+**Live (HTTP) at http://98.84.244.237** — full stack deployed and verified:
+Postgres + Redis (Docker), FastAPI under systemd (`strykd-api`), React build
+served by Nginx. End-to-end smoke test passed on the box (register → subscription
+gate → real LLM onboarding → public page → Redis cache → SSE streaming).
+
+**Pending — domain + SSL:** `strykd.io` / `*.strykd.io` do not resolve yet. Add
+the Namecheap records in `DNS.md` (apex `A` + wildcard `*` `A` → `98.84.244.237`),
+then run the certbot step in `setup.sh` for the wildcard HTTPS cert. Until then,
+the app is reachable only by IP over HTTP.
+
+## How it was deployed
+
+The repo is **private**, so instead of a server-side `git clone` the working tree
+is **rsynced** to the box and `deploy/provision.sh` runs the non-interactive,
+HTTP-only provisioning (everything except the interactive DNS-01 cert):
+
+```sh
+rsync -az --delete -e "ssh -i strykd-key.pem" \
+  --exclude .git --exclude node_modules --exclude .venv --exclude dist \
+  --exclude '*.pem' --exclude backend/.env --exclude .claude --exclude __pycache__ \
+  ./ ubuntu@98.84.244.237:/home/ubuntu/strykd/
+
+# backend/.env is written separately (real secrets, FRONTEND_URL=http://98.84.244.237)
+ssh -i strykd-key.pem ubuntu@98.84.244.237 \
+  "cd /home/ubuntu/strykd && sudo APP_DIR=/home/ubuntu/strykd PUBLIC_IP=98.84.244.237 bash deploy/provision.sh"
+```
+
+`provision.sh` is idempotent — re-run after an rsync to redeploy. Note: Nginx
+runs as `www-data`, so `/home/ubuntu` needs the traverse bit (`chmod o+x /home/ubuntu`)
+for it to read the frontend build.
+
+`setup.sh` remains the canonical full installer (adds the Let's Encrypt wildcard
+cert + HTTPS vhost) for the eventual DNS-backed cutover.
+
+---
+
 Infrastructure provisioned in AWS account `664418982465` (us-east-1):
 
 | Resource        | ID                        | Detail                              |
