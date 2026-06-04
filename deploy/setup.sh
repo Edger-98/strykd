@@ -10,7 +10,7 @@
 #
 # Installs Docker + Compose, Nginx, Certbot; clones the repo; writes .env;
 # starts Postgres + Redis + the FastAPI backend; configures Nginx wildcard
-# routing for strykd.io and *.strykd.io; obtains a Let's Encrypt wildcard
+# routing for strykdapp.com and *.strykdapp.com; obtains a Let's Encrypt wildcard
 # cert via DNS-01 challenge.
 #
 # Idempotent where practical — safe to re-run.
@@ -19,7 +19,7 @@ set -euo pipefail
 # ─────────────────────────────────────────────────────────────────────────────
 # Config — edit these before running, or export them in the environment first
 # ─────────────────────────────────────────────────────────────────────────────
-DOMAIN="${DOMAIN:-strykd.io}"
+DOMAIN="${DOMAIN:-strykdapp.com}"
 REPO="${REPO:-https://github.com/Edger-98/strykd.git}"
 APP_DIR="${APP_DIR:-/home/ubuntu/strykd}"
 LETSENCRYPT_EMAIL="${LETSENCRYPT_EMAIL:-chinemenwatu98@gmail.com}"
@@ -160,7 +160,7 @@ npm run build   # → frontend/dist
 # 9. Obtain the Let's Encrypt WILDCARD cert via DNS-01
 #    Wildcards CANNOT use HTTP-01 — DNS-01 is mandatory.
 #    This is interactive: certbot prints a TXT record you must add at Namecheap
-#    (_acme-challenge.strykd.io), then you press Enter to continue.
+#    (_acme-challenge.strykdapp.com), then you press Enter to continue.
 # ─────────────────────────────────────────────────────────────────────────────
 echo "==> Obtaining wildcard SSL certificate (DNS-01 challenge)"
 echo "    You will be asked to create a TXT record at your DNS provider."
@@ -170,7 +170,7 @@ sudo certbot certonly --manual --preferred-challenges dns \
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 10. Nginx — wildcard routing.
-#     ALL hosts (strykd.io and every {slug}.strykd.io) proxy to the FastAPI
+#     ALL hosts (strykdapp.com and every {slug}.strykdapp.com) proxy to the FastAPI
 #     backend; the app does slug lookup internally. Static frontend assets are
 #     served directly, with SPA fallback to index.html.
 # ─────────────────────────────────────────────────────────────────────────────

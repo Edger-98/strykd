@@ -1,7 +1,7 @@
 # Strykd — Project Architecture & Build Brief
 
 ## What is Strykd?
-Strykd (strykd.io) is an AI-powered accountability SaaS. Users describe their goals and time frame, the AI generates a personalized daily plan and visual theme, and deploys it to their own live subdomain (e.g. `edger.strykd.io`). The public page is shareable — visitors see the user's goals, streak, daily tasks, and a live signal wall. Users interact with their private dashboard to check off tasks, trigger AI replanning via a streaming endpoint, and manage their subscription.
+Strykd (strykdapp.com) is an AI-powered accountability SaaS. Users describe their goals and time frame, the AI generates a personalized daily plan and visual theme, and deploys it to their own live subdomain (e.g. `edger.strykdapp.com`). The public page is shareable — visitors see the user's goals, streak, daily tasks, and a live signal wall. Users interact with their private dashboard to check off tasks, trigger AI replanning via a streaming endpoint, and manage their subscription.
 
 ## Stack
 - **Backend:** FastAPI (Python)
@@ -14,10 +14,10 @@ Strykd (strykd.io) is an AI-powered accountability SaaS. Users describe their go
 - **SSL:** Let's Encrypt wildcard cert
 
 ## Core User Flow
-1. User signs up at strykd.io → Stripe checkout → subscription active
+1. User signs up at strykdapp.com → Stripe checkout → subscription active
 2. Onboarding form: goals, time frame (days), aesthetic preference, identity slug
 3. LLM generates: full daily plan, theme JSON, mission statement, Week chapter titles, Day 1 signal wall entry
-4. Subdomain provisioned: `{slug}.strykd.io` goes live instantly
+4. Subdomain provisioned: `{slug}.strykdapp.com` goes live instantly
 5. User logs into private dashboard daily → checks off tasks → interacts with LLM
 6. LLM streaming replan: user requests change → FastAPI StreamingResponse → tokens stream to browser → user previews → confirms → DB write → Redis cache busted → public page updated
 7. Signal wall: one AI-generated narrative entry per day, shown on public page as a live journal
@@ -194,7 +194,7 @@ STRIPE_WEBHOOK_SECRET=
 STRIPE_PRICE_ID=
 JWT_SECRET=
 FRONTEND_URL=http://localhost:5173
-BASE_DOMAIN=strykd.io
+BASE_DOMAIN=strykdapp.com
 ```
 
 ## Day by Day Build Plan

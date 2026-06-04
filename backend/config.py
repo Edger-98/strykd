@@ -11,12 +11,12 @@ class Settings(BaseSettings):
     stripe_webhook_secret: str = ""
     stripe_price_id: str = ""
     resend_api_key: str = ""
-    resend_from: str = "Strykd <noreply@strykd.io>"
+    resend_from: str = "Strykd <noreply@strykdapp.com>"
     jwt_secret: str = "changeme"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 24 * 7  # 7 days
     frontend_url: str = "http://localhost:5173"
-    base_domain: str = "strykd.io"
+    base_domain: str = "strykdapp.com"
     cron_secret: str = "changeme-cron-secret"
 
 

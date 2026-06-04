@@ -7,7 +7,7 @@ Postgres + Redis (Docker), FastAPI under systemd (`strykd-api`), React build
 served by Nginx. End-to-end smoke test passed on the box (register → subscription
 gate → real LLM onboarding → public page → Redis cache → SSE streaming).
 
-**Pending — domain + SSL:** `strykd.io` / `*.strykd.io` do not resolve yet. Add
+**Pending — domain + SSL:** `strykdapp.com` / `*.strykdapp.com` do not resolve yet. Add
 the Namecheap records in `DNS.md` (apex `A` + wildcard `*` `A` → `98.84.244.237`),
 then run the certbot step in `setup.sh` for the wildcard HTTPS cert. Until then,
 the app is reachable only by IP over HTTP.
@@ -74,13 +74,13 @@ Infrastructure provisioned in AWS account `664418982465` (us-east-1):
    value. Add it at Namecheap (`_acme-challenge`, see `DNS.md`), wait ~1 min,
    then press Enter to finish issuing the wildcard cert.
 
-4. Visit `https://strykd.io` and any `https://<slug>.strykd.io`.
+4. Visit `https://strykdapp.com` and any `https://<slug>.strykdapp.com`.
 
 ## What setup.sh does
 
 Docker + Compose · Nginx · Certbot → clones the repo → writes `backend/.env` →
 starts Postgres + Redis (compose) → runs FastAPI under systemd (`strykd-api`) →
-builds the React frontend → Nginx wildcard vhost (`strykd.io` + `*.strykd.io`,
+builds the React frontend → Nginx wildcard vhost (`strykdapp.com` + `*.strykdapp.com`,
 SSE-friendly proxy to `:8000`, SPA fallback) → Let's Encrypt wildcard cert.
 
 ## Useful commands (on the server)
