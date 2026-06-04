@@ -39,13 +39,13 @@ export default function Landing() {
       minHeight: '100vh', display: 'grid', placeItems: 'center',
       background: '#0D0805', color: '#F5F0EB', padding: '1.5rem',
     }}>
-      <div style={{ width: '100%', maxWidth: 380 }}>
-        <h1 style={{
-          fontSize: '3rem', fontWeight: 900, letterSpacing: '0.04em',
+      <div className="page-enter" style={{ width: '100%', maxWidth: 380 }}>
+        <h1 className="anim-up-lg" style={{
+          fontSize: '3.5rem', fontWeight: 900, letterSpacing: '0.04em',
           textAlign: 'center', marginBottom: '0.5rem',
           fontFamily: '"Arial Black", Impact, sans-serif',
         }}>STRYKD</h1>
-        <p style={{ textAlign: 'center', color: '#A89080', marginBottom: '2.5rem', fontSize: '0.95rem' }}>
+        <p className="anim-up d2" style={{ textAlign: 'center', color: '#A89080', marginBottom: '2.5rem', fontSize: '0.95rem' }}>
           AI-powered accountability. Live on your own subdomain.
         </p>
 
