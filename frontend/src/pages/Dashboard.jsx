@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import {
+  LayoutGrid, Flame, Radio, ExternalLink, LogOut, Target, Menu, X,
+} from 'lucide-react'
 import Checklist from '../components/Checklist'
 import ReplanPanel from '../components/ReplanPanel'
 import SignalWall from '../components/SignalWall'
-import ThemeWrapper from '../components/ThemeWrapper'
 import { useCountUp } from '../hooks'
 import { api, clearToken, getToken } from '../api'
 
@@ -11,6 +13,8 @@ export default function Dashboard() {
   const nav = useNavigate()
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
+  const [tab, setTab] = useState('today') // 'today' | 'signal'
+  const [navOpen, setNavOpen] = useState(false)
 
   const load = useCallback(() => {
     api.dashboard().then(setData).catch(e => {
@@ -33,9 +37,9 @@ export default function Dashboard() {
   }
 
   if (error) return <Centered>{error}</Centered>
-  if (!data) return <Centered>Loading your dashboard…</Centered>
+  if (!data) return <Centered>Loading…</Centered>
 
-  const { user, theme, goals, today_tasks, signal_wall } = data
+  const { user, goals, today_tasks, signal_wall } = data
   const goalId = goals?.[0]?.id
   const taskDate = today_tasks?.[0]?.task_date || new Date().toISOString().slice(0, 10)
   const done = today_tasks.filter(t => t.completed).length
@@ -43,108 +47,136 @@ export default function Dashboard() {
   const pct = total ? Math.round((done / total) * 100) : 0
 
   return (
-    <ThemeWrapper theme={theme}>
-      <div className="page-enter" style={{ maxWidth: 700, margin: '0 auto', padding: '2rem 1.5rem 5rem' }}>
-        {/* Top bar */}
-        <div className="anim-fade" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
-          <span style={{ fontSize: '0.82rem', letterSpacing: '0.18em', color: 'var(--fg-muted)', fontWeight: 700 }}>
-            STRYKD
-          </span>
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            {user.page_public !== false && (
-              <a href={`/${user.slug}`} target="_blank" rel="noreferrer"
-                 style={{ fontSize: '0.82rem', color: 'var(--accent)', fontWeight: 600 }}>
-                View public page ↗
-              </a>
-            )}
-            <button onClick={() => { clearToken(); nav('/') }} style={{
-              fontSize: '0.8rem', color: 'var(--fg-dim)', background: 'none',
-              border: '1px solid var(--border)', borderRadius: 8, padding: '0.35rem 0.75rem',
-            }}>Log out</button>
-          </div>
+    <div style={S.shell}>
+      {/* ── Sidebar (Linear-style) ── */}
+      <aside className={`dash-sidebar${navOpen ? ' open' : ''}`} style={S.sidebar}>
+        <div style={S.sideTop}>
+          <span style={S.brand}>STRYKD</span>
+          <button style={S.iconBtn} onClick={() => setNavOpen(false)}><X size={18} /></button>
         </div>
 
-        {/* Hero stats */}
-        <header className="anim-up d1" style={{ marginBottom: '2.5rem' }}>
-          <h1 style={{
-            fontFamily: 'var(--font-display)', fontWeight: 'var(--fw-display)',
-            letterSpacing: 'var(--ls-display)', fontSize: 'clamp(2rem, 7vw, 3rem)', marginBottom: '1.5rem',
-          }}>
-            Hello, {user.name.split(' ')[0]}
-          </h1>
-
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <StreakCard streak={user.streak_days} />
-            <ProgressCard done={done} total={total} pct={pct} />
-          </div>
-
-          {theme?.daily_headline && (
-            <p className="anim-up d3" style={{ color: 'var(--fg-dim)', marginTop: '1.5rem', fontSize: '1.05rem', lineHeight: 1.5 }}>
-              {theme.daily_headline}
-            </p>
+        <nav style={S.navList}>
+          <NavItem active={tab === 'today'} Icon={LayoutGrid} label="Today" onClick={() => { setTab('today'); setNavOpen(false) }} />
+          <NavItem active={tab === 'signal'} Icon={Radio} label="Signal Wall" onClick={() => { setTab('signal'); setNavOpen(false) }} />
+          {user.page_public !== false && (
+            <a href={`/${user.slug}`} target="_blank" rel="noreferrer" style={S.navItem}>
+              <ExternalLink size={18} /> <span>Public page</span>
+            </a>
           )}
+        </nav>
+
+        {/* Streak (neon blue) */}
+        <div style={{ marginTop: 'auto' }}>
+          <StreakBadge streak={user.streak_days} />
+          <button style={S.logout} onClick={() => { clearToken(); nav('/') }}>
+            <LogOut size={16} /> Log out
+          </button>
+        </div>
+      </aside>
+
+      {navOpen && <div style={S.overlay} onClick={() => setNavOpen(false)} />}
+
+      {/* ── Main ── */}
+      <main className="dash-main" style={S.main}>
+        <header style={S.mainHeader}>
+          <button className="dash-menu-btn" style={S.iconBtn} onClick={() => setNavOpen(true)}><Menu size={20} /></button>
+          <div className="anim-up">
+            <p className="eyebrow" style={{ marginBottom: '0.5rem' }}>
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+            </p>
+            <h1 className="display h-lg">Hello, {user.name.split(' ')[0]}</h1>
+          </div>
         </header>
 
-        {/* Checklist */}
-        <section className="anim-up d3" style={{ marginBottom: '2rem' }}>
-          <Eyebrow>Today's Tasks</Eyebrow>
-          <Checklist tasks={today_tasks} onUpdate={onTaskComplete} />
-          {goalId && <ReplanPanel goalId={goalId} taskDate={taskDate} onConfirmed={load} />}
-        </section>
+        {tab === 'today' ? (
+          <div className="anim-up d1">
+            {/* progress */}
+            <div style={S.progressRow}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+                <Target size={18} color="var(--text-muted)" />
+                <span style={{ fontSize: '1.6rem', fontWeight: 800 }}>{done}<span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>/{total}</span></span>
+                <span style={{ color: pct === 100 ? 'var(--blue)' : 'var(--text-dim)', fontSize: '0.85rem', fontWeight: 600 }}>
+                  {pct === 100 ? 'complete' : `${pct}% done`}
+                </span>
+              </div>
+            </div>
+            <div style={S.bar}>
+              <div className="progress-fill" style={{ height: '100%', width: `${pct}%`, background: 'var(--blue)', borderRadius: 5 }} />
+            </div>
 
-        {/* Signal Wall */}
-        <section className="anim-up d4" style={{ marginTop: '3rem' }}>
-          <Eyebrow>Signal Wall</Eyebrow>
-          <SignalWall entries={signal_wall} />
-        </section>
-      </div>
-    </ThemeWrapper>
+            <h2 className="eyebrow" style={S.sectionTitle}>Today's Tasks</h2>
+            <Checklist tasks={today_tasks} onUpdate={onTaskComplete} />
+            {goalId && <ReplanPanel goalId={goalId} taskDate={taskDate} onConfirmed={load} />}
+          </div>
+        ) : (
+          <div className="anim-up d1">
+            <h2 className="eyebrow" style={S.sectionTitle}>Signal Wall</h2>
+            <SignalWall entries={signal_wall} />
+          </div>
+        )}
+      </main>
+    </div>
   )
 }
 
-function StreakCard({ streak }) {
+function NavItem({ active, Icon, label, onClick }) {
+  return (
+    <button onClick={onClick} style={{ ...S.navItem, ...(active ? S.navItemActive : {}) }}>
+      <Icon size={18} color={active ? 'var(--red)' : 'var(--text-dim)'} /> <span>{label}</span>
+    </button>
+  )
+}
+
+function StreakBadge({ streak }) {
   const n = useCountUp(streak)
   return (
-    <div className="card" style={{ flex: 1, minWidth: 140, padding: '1.25rem' }}>
-      <div style={{ fontSize: '2.4rem', fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}>
-        🔥 {n}
+    <div style={S.streakCard}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <Flame size={20} color="var(--blue)" />
+        <span style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--blue)', lineHeight: 1 }}>{n}</span>
       </div>
-      <div style={{ fontSize: '0.78rem', color: 'var(--fg-muted)', letterSpacing: '0.08em', marginTop: '0.5rem' }}>
+      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', letterSpacing: '0.12em', fontWeight: 700, marginTop: '0.4rem', display: 'block' }}>
         DAY STREAK
-      </div>
+      </span>
     </div>
-  )
-}
-
-function ProgressCard({ done, total, pct }) {
-  return (
-    <div className="card" style={{ flex: 2, minWidth: 180, padding: '1.25rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.75rem' }}>
-        <span style={{ fontSize: '1.4rem', fontWeight: 800 }}>{done}<span style={{ color: 'var(--fg-muted)', fontWeight: 400 }}>/{total}</span></span>
-        <span style={{ fontSize: '0.82rem', color: pct === 100 ? 'var(--accent)' : 'var(--fg-dim)', fontWeight: 600 }}>
-          {pct}% {pct === 100 ? '· complete' : 'done today'}
-        </span>
-      </div>
-      <div style={{ height: 8, background: 'var(--bg-hover)', borderRadius: 5, overflow: 'hidden' }}>
-        <div className="progress-fill" style={{ height: '100%', width: `${pct}%`, background: 'var(--accent)', borderRadius: 5 }} />
-      </div>
-    </div>
-  )
-}
-
-function Eyebrow({ children }) {
-  return (
-    <h2 style={{
-      fontSize: '0.78rem', letterSpacing: '0.18em', color: 'var(--fg-muted)', fontWeight: 700,
-      textTransform: 'uppercase', marginBottom: '1rem', paddingBottom: '0.6rem', borderBottom: '1px solid var(--border)',
-    }}>{children}</h2>
   )
 }
 
 function Centered({ children }) {
   return (
-    <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: 'var(--bg, #0D0805)' }}>
-      <p className="anim-fade" style={{ color: 'var(--fg-dim, #A89080)' }}>{children}</p>
+    <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: 'var(--black)' }}>
+      <p className="anim-fade" style={{ color: 'var(--text-dim)' }}>{children}</p>
     </div>
   )
+}
+
+const SIDEBAR_W = 248
+const S = {
+  shell: { minHeight: '100vh', background: 'var(--black)', display: 'flex' },
+  sidebar: {
+    width: SIDEBAR_W, flexShrink: 0, background: 'var(--surface)', borderRight: '1px solid var(--line)',
+    display: 'flex', flexDirection: 'column', padding: '1.5rem 1rem', position: 'fixed', top: 0, bottom: 0, left: 0,
+    transition: 'transform 0.25s var(--ease-out)', zIndex: 30,
+  },
+  sideTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 0.5rem', marginBottom: '2rem' },
+  brand: { fontWeight: 800, letterSpacing: '0.12em', fontSize: '1rem' },
+  navList: { display: 'flex', flexDirection: 'column', gap: '0.25rem' },
+  navItem: {
+    display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.7rem 0.75rem',
+    background: 'transparent', border: 'none', borderRadius: 10, color: 'var(--text-dim)',
+    fontSize: '0.92rem', fontWeight: 500, width: '100%', textAlign: 'left', transition: 'all 0.15s var(--ease-out)',
+  },
+  navItemActive: { background: 'var(--surface-2)', color: 'var(--white)' },
+  streakCard: { background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem', marginBottom: '0.75rem' },
+  logout: {
+    display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.7rem 0.75rem', width: '100%',
+    background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500, borderRadius: 10,
+  },
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 20 },
+  main: { flex: 1, marginLeft: SIDEBAR_W, padding: '2.5rem clamp(1.25rem, 5vw, 3rem)', maxWidth: 820, width: '100%' },
+  mainHeader: { display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2.5rem' },
+  iconBtn: { background: 'transparent', border: 'none', color: 'var(--text-dim)', padding: 4, display: 'grid', placeItems: 'center' },
+  progressRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' },
+  bar: { height: 8, background: 'var(--surface-2)', borderRadius: 5, overflow: 'hidden', marginBottom: '2.5rem' },
+  sectionTitle: { marginBottom: '1rem', paddingBottom: '0.6rem', borderBottom: '1px solid var(--line)' },
 }

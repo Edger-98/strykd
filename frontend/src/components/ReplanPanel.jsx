@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Sparkles, ChevronDown, ChevronUp, Check, X } from 'lucide-react'
 import { api } from '../api'
 
 export default function ReplanPanel({ goalId, taskDate, onConfirmed }) {
@@ -11,41 +12,29 @@ export default function ReplanPanel({ goalId, taskDate, onConfirmed }) {
 
   const submit = async () => {
     if (!request.trim() || streaming) return
-    setPreview('')
-    setDone(false)
-    setError('')
-    setStreaming(true)
-
+    setPreview(''); setDone(false); setError(''); setStreaming(true)
     try {
       const res = await api.replanStream(request.trim())
       if (!res.ok) {
         const e = await res.json().catch(() => ({}))
         throw new Error(e.detail || 'Stream failed')
       }
-
       const reader = res.body.getReader()
       const dec = new TextDecoder()
       let buf = ''
-
       while (true) {
         const { done: d, value } = await reader.read()
         if (d) break
         buf += dec.decode(value, { stream: true })
-
-        // Parse complete SSE messages
         const parts = buf.split('\n\n')
         buf = parts.pop() || ''
-
         for (const part of parts) {
           for (const line of part.split('\n')) {
             if (!line.startsWith('data: ')) continue
             const raw = line.slice(6)
             if (raw === '[DONE]') { setDone(true); setStreaming(false); return }
-            try {
-              setPreview(p => p + JSON.parse(raw))
-            } catch {
-              setPreview(p => p + raw)
-            }
+            try { setPreview(p => p + JSON.parse(raw)) }
+            catch { setPreview(p => p + raw) }
           }
         }
       }
@@ -58,135 +47,65 @@ export default function ReplanPanel({ goalId, taskDate, onConfirmed }) {
 
   const confirm = async () => {
     if (!preview.trim()) return
-    // Parse preview lines into task objects
-    const tasks = preview
-      .split('\n')
-      .map(l => l.replace(/^\d+\.\s*/, '').trim())
+    const tasks = preview.split('\n')
+      .map(l => l.replace(/^\d+\.\s*/, '').replace(/^\[\d{4}-\d{2}-\d{2}\]\s*/, '').trim())
       .filter(Boolean)
       .map(content => ({ content, voice_style: 'direct' }))
-
     try {
       await api.replanConfirm({ goal_id: goalId, task_date: taskDate, tasks })
-      setPreview('')
-      setRequest('')
-      setDone(false)
-      setOpen(false)
+      setPreview(''); setRequest(''); setDone(false); setOpen(false)
       onConfirmed && onConfirmed()
     } catch (e) {
       setError(e.message)
     }
   }
 
-  const s = {
-    panel: {
-      border: '1px solid var(--border)',
-      borderRadius: 10,
-      overflow: 'hidden',
-      marginTop: '1.5rem',
-    },
-    header: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      padding: '0.9rem 1.25rem',
-      background: 'var(--bg-card)',
-      cursor: 'pointer',
-      userSelect: 'none',
-    },
-    body: { padding: '1.25rem', background: 'var(--bg-card)', borderTop: '1px solid var(--border)' },
-    textarea: {
-      width: '100%',
-      minHeight: 80,
-      padding: '0.75rem',
-      background: 'var(--bg)',
-      color: 'var(--fg)',
-      border: '1px solid var(--border)',
-      borderRadius: 6,
-      resize: 'vertical',
-      fontSize: '0.9rem',
-      outline: 'none',
-    },
-    btn: (variant = 'primary') => ({
-      padding: '0.6rem 1.2rem',
-      background: variant === 'primary' ? 'var(--accent)' : 'transparent',
-      color: variant === 'primary' ? '#fff' : 'var(--fg-dim)',
-      border: `1px solid ${variant === 'primary' ? 'var(--accent)' : 'var(--border)'}`,
-      borderRadius: 6,
-      fontWeight: 600,
-      fontSize: '0.85rem',
-      opacity: streaming ? 0.5 : 1,
-    }),
-    preview: {
-      marginTop: '1rem',
-      padding: '0.9rem',
-      background: 'var(--bg)',
-      border: '1px solid var(--border)',
-      borderRadius: 6,
-      fontSize: '0.88rem',
-      lineHeight: 1.65,
-      color: 'var(--fg)',
-      whiteSpace: 'pre-wrap',
-      minHeight: 60,
-    },
-  }
-
   return (
-    <div style={s.panel}>
-      <div style={s.header} onClick={() => setOpen(o => !o)}>
-        <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>
-          ✦ Replan with AI
+    <div className="card" style={{ overflow: 'hidden', marginTop: '1.5rem' }}>
+      <button onClick={() => setOpen(o => !o)} style={S.header}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontWeight: 600, fontSize: '0.92rem' }}>
+          <Sparkles size={17} color="var(--blue)" /> Replan with AI
         </span>
-        <span style={{ color: 'var(--fg-dim)', fontSize: '0.85rem' }}>
-          {open ? '▲' : '▼'}
-        </span>
-      </div>
+        {open ? <ChevronUp size={17} color="var(--text-muted)" /> : <ChevronDown size={17} color="var(--text-muted)" />}
+      </button>
 
       {open && (
-        <div style={s.body}>
-          <p style={{ fontSize: '0.82rem', color: 'var(--fg-dim)', marginBottom: '0.75rem' }}>
-            Describe what you want to change about today's tasks.
+        <div style={S.body}>
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-dim)', marginBottom: '0.75rem' }}>
+            Describe what to change about today's tasks.
           </p>
-
-          <textarea
-            style={s.textarea}
-            placeholder="e.g. Make the morning tasks lighter, I only have 30 minutes..."
-            value={request}
-            onChange={e => setRequest(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && e.metaKey && submit()}
-          />
+          <textarea className="field" style={{ minHeight: 80, resize: 'vertical' }}
+            placeholder="e.g. Make the morning lighter, I only have 30 minutes…"
+            value={request} onChange={e => setRequest(e.target.value)}
+            onKeyDown={e => (e.metaKey || e.ctrlKey) && e.key === 'Enter' && submit()} />
 
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
-            <button style={s.btn('primary')} onClick={submit} disabled={streaming}>
+            <button className="pill pill-blue pill-sm" onClick={submit} disabled={streaming}>
               {streaming ? 'Thinking…' : 'Generate preview'}
             </button>
             {preview && !streaming && (
-              <button style={s.btn('secondary')} onClick={() => { setPreview(''); setDone(false) }}>
+              <button className="pill pill-outline pill-sm" onClick={() => { setPreview(''); setDone(false) }}>
                 Clear
               </button>
             )}
           </div>
 
-          {error && (
-            <p style={{ color: '#E85D04', fontSize: '0.82rem', marginTop: '0.5rem' }}>{error}</p>
-          )}
+          {error && <p style={{ color: 'var(--red)', fontSize: '0.82rem', marginTop: '0.5rem' }}>{error}</p>}
 
           {(preview || streaming) && (
-            <div style={s.preview}>
-              {preview || <span style={{ color: 'var(--fg-muted)' }}>Generating…</span>}
-              {streaming && <span style={{ opacity: 0.5 }}>█</span>}
+            <div style={S.preview}>
+              {preview || <span style={{ color: 'var(--text-muted)' }}>Generating…</span>}
+              {streaming && <span className="cursor-blink">▋</span>}
             </div>
           )}
 
           {done && preview && (
             <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem' }}>
-              <button
-                style={{ ...s.btn('primary'), background: '#2ECC71', borderColor: '#2ECC71' }}
-                onClick={confirm}
-              >
-                ✓ Apply changes
+              <button className="pill pill-red pill-sm" onClick={confirm}>
+                <Check size={15} /> Apply changes
               </button>
-              <button style={s.btn('secondary')} onClick={() => { setPreview(''); setDone(false) }}>
-                Discard
+              <button className="pill pill-outline pill-sm" onClick={() => { setPreview(''); setDone(false) }}>
+                <X size={15} /> Discard
               </button>
             </div>
           )}
@@ -194,4 +113,17 @@ export default function ReplanPanel({ goalId, taskDate, onConfirmed }) {
       )}
     </div>
   )
+}
+
+const S = {
+  header: {
+    width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    padding: '0.95rem 1.25rem', background: 'transparent', border: 'none', color: 'var(--white)',
+  },
+  body: { padding: '1.25rem', borderTop: '1px solid var(--line)' },
+  preview: {
+    marginTop: '1rem', padding: '0.9rem 1rem', background: 'var(--black)',
+    border: '1px solid var(--line)', borderRadius: 10, fontSize: '0.88rem',
+    lineHeight: 1.65, color: 'var(--text)', whiteSpace: 'pre-wrap', minHeight: 60,
+  },
 }
