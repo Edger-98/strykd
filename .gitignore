@@ -40,3 +40,4 @@ redis_data/
 .pytest_cache/
 .coverage
 htmlcov/
+.claude/
