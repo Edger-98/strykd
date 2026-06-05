@@ -4,6 +4,7 @@ import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
 import './styles.css'
 import Dashboard from './pages/Dashboard'
+import Journey from './pages/Journey'
 import Landing from './pages/Landing'
 import Onboarding from './pages/Onboarding'
 import PublicPage from './pages/PublicPage'
@@ -16,6 +17,7 @@ function AnimatedRoutes() {
         <Route path="/" element={<Landing />} />
         <Route path="/onboard" element={<Onboarding />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/dashboard/journey" element={<Journey />} />
         <Route path="/:slug" element={<PublicPage />} />
       </Routes>
     </AnimatePresence>

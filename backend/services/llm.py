@@ -64,6 +64,7 @@ Rules:
 - chapter_titles must have one entry per week (ceil(duration_days / 7))
 - voice_style must be one of: direct, motivational, reflective
 - color_palette, typography_variant, layout_variant must be chosen based on the aesthetic preference
+- Never use em dashes or en dashes anywhere in any text. Use periods or commas only.
 """
 
 
@@ -127,7 +128,70 @@ async def generate_plan(
         lines = raw.split("\n")
         raw = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
 
-    return json.loads(raw)
+    return _strip_dashes_deep(json.loads(raw))
+
+
+def _strip_em_dashes(text: str) -> str:
+    # Replace em/en dashes with a comma-space; collapse any accidental ", ," runs.
+    cleaned = text.replace(" — ", ", ").replace("—", ", ").replace(" – ", ", ").replace("–", ", ")
+    while ", ," in cleaned:
+        cleaned = cleaned.replace(", ,", ",")
+    return cleaned.strip()
+
+
+def _strip_dashes_deep(obj):
+    """Recursively strip em/en dashes from every string in a parsed JSON structure."""
+    if isinstance(obj, str):
+        return _strip_em_dashes(obj)
+    if isinstance(obj, list):
+        return [_strip_dashes_deep(v) for v in obj]
+    if isinstance(obj, dict):
+        return {k: _strip_dashes_deep(v) for k, v in obj.items()}
+    return obj
+
+
+async def generate_projected_outcome(
+    goal_description: str,
+    duration_days: int,
+    hours_per_day: int | None,
+    life_area: str | None,
+) -> str:
+    """Generate a specific, vivid projected outcome for finishing the plan.
+
+    Returns plain text with no em dashes.
+    """
+    client = _get_client()
+    hours = hours_per_day or 2
+    sessions = duration_days * hours  # rough "focused sessions/hours" figure to anchor specificity
+
+    response = await client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=400,
+        system=(
+            "You are a world-class productivity coach. You write a single specific, vivid "
+            "projection of what someone will have achieved if they show up every single day "
+            "of their plan. Be concrete: reference real numbers (sessions, hours, milestones), "
+            "a tangible deliverable, and the compounding habit that outlasts the plan. "
+            "Write 2 to 3 sentences, second person ('you will have...'). "
+            "IMPORTANT: Never use em dashes or en dashes. Use periods or commas only. "
+            "Return ONLY the projection text, no preamble, no quotes."
+        ),
+        messages=[
+            {
+                "role": "user",
+                "content": (
+                    f"Goal: {goal_description}\n"
+                    f"Duration: {duration_days} days\n"
+                    f"Focused hours per day: {hours}\n"
+                    f"Life area: {life_area or 'unspecified'}\n"
+                    f"Approx. total focused hours across the plan: {sessions}\n\n"
+                    f"Write the projected outcome for completing day {duration_days}."
+                ),
+            }
+        ],
+    )
+    raw = next(b.text for b in response.content if b.type == "text").strip().strip('"')
+    return _strip_em_dashes(raw)
 
 
 async def stream_replan(current_tasks: list[str], change_request: str):
@@ -137,7 +201,7 @@ async def stream_replan(current_tasks: list[str], change_request: str):
         max_tokens=4096,
         system=(
             "You are the user's personal AI accountability coach with full context of "
-            "their goals and progress. Stream each revised task as you write it."
+            "their goals and progress. Stream each revised task as you write it. Never use em dashes or en dashes; use periods or commas only."
         ),
         messages=[
             {
@@ -151,7 +215,7 @@ async def stream_replan(current_tasks: list[str], change_request: str):
         ],
     ) as stream:
         async for text in stream.text_stream:
-            yield text
+            yield text.replace('—', ', ').replace('–', ', ')
 
 
 async def generate_nightly(goals: str, completed_tasks: list[str]) -> dict:
@@ -159,7 +223,7 @@ async def generate_nightly(goals: str, completed_tasks: list[str]) -> dict:
     response = await client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=2048,
-        system="You are generating daily content for an accountability platform. Return ONLY valid JSON.",
+        system="You are generating daily content for an accountability platform. Return ONLY valid JSON. Never use em dashes or en dashes in any text; use periods or commas only.",
         messages=[
             {
                 "role": "user",
@@ -179,4 +243,4 @@ async def generate_nightly(goals: str, completed_tasks: list[str]) -> dict:
     if raw.startswith("```"):
         lines = raw.split("\n")
         raw = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
-    return json.loads(raw)
+    return _strip_dashes_deep(json.loads(raw))

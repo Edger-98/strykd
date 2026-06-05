@@ -27,6 +27,7 @@ export const api = {
   login: body => req('POST', '/auth/login', body),
 
   dashboard: () => req('GET', '/dashboard'),
+  journey: () => req('GET', '/journey'),
   publicPage: slug => fetch(`${API}/public/${slug}`).then(r => r.ok ? r.json() : Promise.reject(r)),
 
   completeTask: id => req('PATCH', `/tasks/${id}/complete`),

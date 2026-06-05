@@ -2,12 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
-  LayoutGrid, Radio, ExternalLink, LogOut, Menu, X, User as UserIcon,
+  ExternalLink, LogOut, Menu, X,
   CreditCard, Lock, Flame, ArrowRight, Loader2, PartyPopper,
 } from 'lucide-react'
 import Checklist from '../components/Checklist'
 import ReplanPanel from '../components/ReplanPanel'
 import SignalWall from '../components/SignalWall'
+import DashSidebar, { SIDEBAR_W } from '../components/DashSidebar'
 import { useCountUp } from '../hooks'
 import { pageVariants } from '../motion'
 import { api, clearToken, getToken } from '../api'
@@ -17,8 +18,8 @@ export default function Dashboard() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
-  const [tab, setTab] = useState('today')
   const [navOpen, setNavOpen] = useState(false)
+  const tab = searchParams.get('tab') === 'signal' ? 'signal' : 'today'
   const [subBusy, setSubBusy] = useState(false)
   const [subError, setSubError] = useState('')
   // captured once on mount, before the strip effect clears them
@@ -83,40 +84,8 @@ export default function Dashboard() {
 
   return (
     <div style={S.shell}>
-      {/* ── Sidebar ── */}
-      <aside className={`dash-sidebar${navOpen ? ' open' : ''}`} style={S.sidebar}>
-        <div style={S.sideTop}>
-          <span style={S.logo}>STRYKD</span>
-          <button style={S.icon} onClick={() => setNavOpen(false)}><X size={18} /></button>
-        </div>
-
-        {/* avatar */}
-        <div style={S.profile}>
-          <div style={S.avatar}><UserIcon size={20} color="var(--d-text-dim)" /></div>
-          <div style={{ overflow: 'hidden' }}>
-            <div style={{ fontWeight: 600, fontSize: '0.92rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.name}</div>
-            <div style={{ color: 'var(--d-text-muted)', fontSize: '0.78rem' }}>@{user.slug}</div>
-          </div>
-        </div>
-
-        <nav style={S.navList}>
-          <NavItem active={tab === 'today'} Icon={LayoutGrid} label="Today" onClick={() => { setTab('today'); setNavOpen(false) }} />
-          <NavItem active={tab === 'signal'} Icon={Radio} label="Signal Wall" onClick={() => { setTab('signal'); setNavOpen(false) }} />
-          {user.page_public !== false && (
-            <a href={`/${user.slug}`} target="_blank" rel="noreferrer" style={S.navItem}>
-              <ExternalLink size={18} /> <span>Public page</span>
-            </a>
-          )}
-        </nav>
-
-        <div style={{ marginTop: 'auto' }}>
-          <button style={S.logout} onClick={() => { clearToken(); nav('/') }}>
-            <LogOut size={16} /> Log out
-          </button>
-        </div>
-      </aside>
-
-      {navOpen && <div style={S.overlay} onClick={() => setNavOpen(false)} />}
+      <DashSidebar user={user} active={tab} navOpen={navOpen} setNavOpen={setNavOpen}
+        onLogout={() => { clearToken(); nav('/') }} />
 
       {/* ── Main ── */}
       <motion.main className="dash-main" style={S.main} variants={pageVariants} initial="initial" animate="animate">
@@ -199,14 +168,6 @@ export default function Dashboard() {
   )
 }
 
-function NavItem({ active, Icon, label, onClick }) {
-  return (
-    <button onClick={onClick} style={{ ...S.navItem, ...(active ? S.navItemActive : {}) }}>
-      <Icon size={18} color={active ? 'var(--red)' : 'var(--d-text-dim)'} /> <span>{label}</span>
-    </button>
-  )
-}
-
 function StreakCard({ streak }) {
   const n = useCountUp(streak)
   return (
@@ -260,25 +221,8 @@ function UpgradePrompt({ user, subscribe, busy, error, onLogout }) {
   )
 }
 
-const SIDEBAR_W = 260
 const S = {
   shell: { minHeight: '100vh', background: 'var(--d-panel)', display: 'flex', color: 'var(--d-text)' },
-  sidebar: {
-    width: SIDEBAR_W, flexShrink: 0, background: 'var(--d-bg)', borderRight: '1px solid var(--d-line)',
-    display: 'flex', flexDirection: 'column', padding: '24px 16px', position: 'fixed', top: 0, bottom: 0, left: 0,
-    transition: 'transform 0.25s var(--ease)', zIndex: 30,
-  },
-  sideTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 8px', marginBottom: 24 },
-  logo: { fontWeight: 800, letterSpacing: '0.12em', fontSize: '1rem' },
-  profile: { display: 'flex', gap: 12, alignItems: 'center', padding: '12px', background: 'var(--d-card)', borderRadius: 14, marginBottom: 20 },
-  avatar: { width: 40, height: 40, borderRadius: '50%', background: 'var(--d-line)', display: 'grid', placeItems: 'center', flexShrink: 0 },
-  navList: { display: 'flex', flexDirection: 'column', gap: 4 },
-  navItem: { display: 'flex', alignItems: 'center', gap: 12, padding: '11px 12px', background: 'transparent', border: 'none',
-    borderRadius: 12, color: 'var(--d-text-dim)', fontSize: '0.92rem', fontWeight: 500, width: '100%', textAlign: 'left', transition: 'all 0.15s var(--ease)' },
-  navItemActive: { background: 'var(--d-card)', color: 'var(--d-text)' },
-  logout: { display: 'flex', alignItems: 'center', gap: 10, padding: '11px 12px', width: '100%', background: 'transparent',
-    border: 'none', color: 'var(--d-text-muted)', fontSize: '0.88rem', fontWeight: 500, borderRadius: 12 },
-  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 20 },
   main: { flex: 1, marginLeft: SIDEBAR_W, padding: '40px clamp(20px, 5vw, 56px)', maxWidth: 860, width: '100%' },
   header: { display: 'flex', alignItems: 'center', gap: 16, marginBottom: 36, flexWrap: 'wrap' },
   date: { color: 'var(--d-text-muted)', fontSize: '0.82rem', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 },

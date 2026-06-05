@@ -18,5 +18,6 @@ class Theme(Base):
     mission_statement: Mapped[str] = mapped_column(Text, nullable=False)
     daily_headline: Mapped[str | None] = mapped_column(Text, nullable=True)
     chapter_titles: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    projected_outcome: Mapped[str | None] = mapped_column(Text, nullable=True)  # AI-generated, cached on first journey visit
 
     user: Mapped["User"] = relationship("User", back_populates="theme")

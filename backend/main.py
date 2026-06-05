@@ -10,6 +10,7 @@ from routes.auth import router as auth_router
 from routes.billing import router as billing_router
 from routes.cron import router as cron_router
 from routes.dashboard import router as dashboard_router
+from routes.journey import router as journey_router
 from routes.onboarding import router as onboarding_router
 
 
@@ -32,6 +33,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(onboarding_router)
 app.include_router(dashboard_router)
+app.include_router(journey_router)
 app.include_router(ai_router)
 app.include_router(billing_router)
 app.include_router(cron_router)

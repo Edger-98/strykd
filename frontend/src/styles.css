@@ -105,6 +105,11 @@ img { display: block; max-width: 100%; }
 /* ── Misc animations kept (framer-motion handles most) ─────────────────── */
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+@keyframes pulseDot {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,45,45,0.6); }
+  50% { box-shadow: 0 0 0 6px rgba(255,45,45,0); }
+}
+.pulse-dot { animation: pulseDot 1.6s ease-in-out infinite; }
 @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 .spinner { width: 44px; height: 44px; border-radius: 50%; border: 3px solid var(--gray-line); border-top-color: var(--black); animation: spin 0.8s linear infinite; }
 .spinner-light { border-color: rgba(255,255,255,0.2); border-top-color: #fff; }
