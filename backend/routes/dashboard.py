@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from deps import get_current_user
+from models.billing import Billing
 from models.goal import Goal
 from models.signal_wall import SignalWall
 from models.task import DailyTask
@@ -131,6 +132,13 @@ async def get_dashboard(
     data["user"]["id"] = str(current_user.id)
     data["user"]["email"] = current_user.email
     data["user"]["subscription_active"] = current_user.subscription_active
+
+    # Trial end (next billing date) drives the "free week active" badge
+    billing = await db.scalar(select(Billing).where(Billing.user_id == current_user.id))
+    data["user"]["trial_ends"] = (
+        billing.next_billing_date.isoformat()
+        if billing and billing.next_billing_date else None
+    )
 
     # Include completed_at for private dashboard
     today = date.today()

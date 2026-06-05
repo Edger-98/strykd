@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import {
-  LayoutGrid, Flame, Radio, ExternalLink, LogOut, Target, Menu, X,
-  PartyPopper,
+  LayoutGrid, Radio, ExternalLink, LogOut, Menu, X, User as UserIcon,
 } from 'lucide-react'
 import Checklist from '../components/Checklist'
 import ReplanPanel from '../components/ReplanPanel'
 import SignalWall from '../components/SignalWall'
 import { useCountUp } from '../hooks'
+import { pageVariants } from '../motion'
 import { api, clearToken, getToken } from '../api'
 
 export default function Dashboard() {
@@ -15,17 +16,8 @@ export default function Dashboard() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
-  const [tab, setTab] = useState('today') // 'today' | 'signal'
+  const [tab, setTab] = useState('today')
   const [navOpen, setNavOpen] = useState(false)
-  // Show the welcome banner once when Stripe redirects back with ?checkout=success
-  const [welcome, setWelcome] = useState(() => searchParams.get('checkout') === 'success')
-
-  useEffect(() => {
-    // Strip the checkout query params so the banner doesn't reappear on refresh
-    if (searchParams.get('checkout')) {
-      setSearchParams({}, { replace: true })
-    }
-  }, [searchParams, setSearchParams])
 
   const load = useCallback(() => {
     api.dashboard().then(setData).catch(e => {
@@ -38,6 +30,10 @@ export default function Dashboard() {
     if (!getToken()) { nav('/'); return }
     load()
   }, [load, nav])
+
+  useEffect(() => {
+    if (searchParams.get('checkout')) setSearchParams({}, { replace: true })
+  }, [searchParams, setSearchParams])
 
   const onTaskComplete = (taskId, newStreak) => {
     setData(d => ({
@@ -57,13 +53,25 @@ export default function Dashboard() {
   const total = today_tasks.length
   const pct = total ? Math.round((done / total) * 100) : 0
 
+  const daysLeft = trialDaysLeft(user.trial_ends)
+  const showTrial = user.subscription_active
+
   return (
     <div style={S.shell}>
-      {/* ── Sidebar (Linear-style) ── */}
+      {/* ── Sidebar ── */}
       <aside className={`dash-sidebar${navOpen ? ' open' : ''}`} style={S.sidebar}>
         <div style={S.sideTop}>
-          <span style={S.brand}>STRYKD</span>
-          <button style={S.iconBtn} onClick={() => setNavOpen(false)}><X size={18} /></button>
+          <span style={S.logo}>STRYKD</span>
+          <button style={S.icon} onClick={() => setNavOpen(false)}><X size={18} /></button>
+        </div>
+
+        {/* avatar */}
+        <div style={S.profile}>
+          <div style={S.avatar}><UserIcon size={20} color="var(--d-text-dim)" /></div>
+          <div style={{ overflow: 'hidden' }}>
+            <div style={{ fontWeight: 600, fontSize: '0.92rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.name}</div>
+            <div style={{ color: 'var(--d-text-muted)', fontSize: '0.78rem' }}>@{user.slug}</div>
+          </div>
         </div>
 
         <nav style={S.navList}>
@@ -76,9 +84,7 @@ export default function Dashboard() {
           )}
         </nav>
 
-        {/* Streak (neon blue) */}
         <div style={{ marginTop: 'auto' }}>
-          <StreakBadge streak={user.streak_days} />
           <button style={S.logout} onClick={() => { clearToken(); nav('/') }}>
             <LogOut size={16} /> Log out
           </button>
@@ -88,43 +94,40 @@ export default function Dashboard() {
       {navOpen && <div style={S.overlay} onClick={() => setNavOpen(false)} />}
 
       {/* ── Main ── */}
-      <main className="dash-main" style={S.main}>
-        {welcome && (
-          <div className="anim-up" style={S.welcome}>
-            <PartyPopper size={20} color="var(--blue)" style={{ flexShrink: 0 }} />
-            <span style={{ flex: 1 }}>
-              <strong>Your free week has started.</strong> No charge for 7 days —
-              cancel anytime. Now show up, check off, and don't break the streak.
-            </span>
-            <button onClick={() => setWelcome(false)} style={S.welcomeClose} aria-label="Dismiss">
-              <X size={16} />
-            </button>
-          </div>
-        )}
-        <header style={S.mainHeader}>
-          <button className="dash-menu-btn" style={S.iconBtn} onClick={() => setNavOpen(true)}><Menu size={20} /></button>
-          <div className="anim-up">
-            <p className="eyebrow" style={{ marginBottom: '0.5rem' }}>
+      <motion.main className="dash-main" style={S.main} variants={pageVariants} initial="initial" animate="animate">
+        <header style={S.header}>
+          <button className="dash-menu-btn" style={S.icon} onClick={() => setNavOpen(true)}><Menu size={20} /></button>
+          <div style={{ flex: 1 }}>
+            <p style={S.date}>
               {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             </p>
-            <h1 className="display h-lg">Hello, {user.name.split(' ')[0]}</h1>
+            <h1 className="h-lg display" style={{ marginTop: 6 }}>Hello, {user.name.split(' ')[0]}</h1>
           </div>
+          {showTrial && (
+            <span style={S.trialBadge}>
+              <span style={S.trialDot} />
+              Free week active{daysLeft != null ? ` — ${daysLeft} day${daysLeft === 1 ? '' : 's'} remaining` : ''}
+            </span>
+          )}
         </header>
 
         {tab === 'today' ? (
-          <div className="anim-up d1">
-            {/* progress */}
-            <div style={S.progressRow}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
-                <Target size={18} color="var(--text-muted)" />
-                <span style={{ fontSize: '1.6rem', fontWeight: 800 }}>{done}<span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>/{total}</span></span>
-                <span style={{ color: pct === 100 ? 'var(--blue)' : 'var(--text-dim)', fontSize: '0.85rem', fontWeight: 600 }}>
-                  {pct === 100 ? 'complete' : `${pct}% done`}
-                </span>
+          <div>
+            {/* streak + progress */}
+            <div style={S.statRow}>
+              <StreakCard streak={user.streak_days} />
+              <div style={S.progCard}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+                  <span style={{ fontSize: '1.5rem', fontWeight: 800 }}>{done}<span style={{ color: 'var(--d-text-muted)', fontWeight: 400 }}>/{total}</span></span>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 600, color: pct === 100 ? 'var(--blue)' : 'var(--d-text-dim)' }}>
+                    {pct === 100 ? 'complete' : `${pct}% done today`}
+                  </span>
+                </div>
+                <div style={S.bar}>
+                  <motion.div style={{ height: '100%', background: 'var(--blue)', borderRadius: 5 }}
+                    initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }} />
+                </div>
               </div>
-            </div>
-            <div style={S.bar}>
-              <div className="progress-fill" style={{ height: '100%', width: `${pct}%`, background: 'var(--blue)', borderRadius: 5 }} />
             </div>
 
             <h2 className="eyebrow" style={S.sectionTitle}>Today's Tasks</h2>
@@ -132,12 +135,12 @@ export default function Dashboard() {
             {goalId && <ReplanPanel goalId={goalId} taskDate={taskDate} onConfirmed={load} />}
           </div>
         ) : (
-          <div className="anim-up d1">
+          <div>
             <h2 className="eyebrow" style={S.sectionTitle}>Signal Wall</h2>
-            <SignalWall entries={signal_wall} />
+            <SignalWall entries={signal_wall} dark />
           </div>
         )}
-      </main>
+      </motion.main>
     </div>
   )
 }
@@ -145,71 +148,65 @@ export default function Dashboard() {
 function NavItem({ active, Icon, label, onClick }) {
   return (
     <button onClick={onClick} style={{ ...S.navItem, ...(active ? S.navItemActive : {}) }}>
-      <Icon size={18} color={active ? 'var(--red)' : 'var(--text-dim)'} /> <span>{label}</span>
+      <Icon size={18} color={active ? 'var(--red)' : 'var(--d-text-dim)'} /> <span>{label}</span>
     </button>
   )
 }
 
-function StreakBadge({ streak }) {
+function StreakCard({ streak }) {
   const n = useCountUp(streak)
   return (
     <div style={S.streakCard}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <Flame size={20} color="var(--blue)" />
-        <span style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--blue)', lineHeight: 1 }}>{n}</span>
-      </div>
-      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', letterSpacing: '0.12em', fontWeight: 700, marginTop: '0.4rem', display: 'block' }}>
-        DAY STREAK
-      </span>
+      <div style={{ fontSize: '2.6rem', fontWeight: 800, color: 'var(--red)', lineHeight: 1 }}>{n}</div>
+      <div style={{ fontSize: '0.72rem', color: 'var(--d-text-muted)', letterSpacing: '0.12em', fontWeight: 700, marginTop: 8 }}>DAY STREAK</div>
     </div>
   )
 }
 
 function Centered({ children }) {
   return (
-    <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: 'var(--black)' }}>
-      <p className="anim-fade" style={{ color: 'var(--text-dim)' }}>{children}</p>
+    <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: 'var(--d-bg)' }}>
+      <p style={{ color: 'var(--d-text-dim)' }}>{children}</p>
     </div>
   )
 }
 
-const SIDEBAR_W = 248
+function trialDaysLeft(iso) {
+  if (!iso) return null
+  const ms = new Date(iso).getTime() - Date.now()
+  if (Number.isNaN(ms)) return null
+  return Math.max(0, Math.ceil(ms / 86400000))
+}
+
+const SIDEBAR_W = 260
 const S = {
-  shell: { minHeight: '100vh', background: 'var(--black)', display: 'flex' },
-  welcome: {
-    display: 'flex', alignItems: 'center', gap: '0.85rem', padding: '1rem 1.25rem',
-    marginBottom: '2rem', borderRadius: 14, lineHeight: 1.5, fontSize: '0.92rem',
-    color: 'var(--white)', background: 'rgba(0,212,255,0.08)',
-    border: '1px solid var(--blue)',
-  },
-  welcomeClose: {
-    flexShrink: 0, background: 'transparent', border: 'none', color: 'var(--text-dim)',
-    display: 'grid', placeItems: 'center', padding: 4,
-  },
+  shell: { minHeight: '100vh', background: 'var(--d-panel)', display: 'flex', color: 'var(--d-text)' },
   sidebar: {
-    width: SIDEBAR_W, flexShrink: 0, background: 'var(--surface)', borderRight: '1px solid var(--line)',
-    display: 'flex', flexDirection: 'column', padding: '1.5rem 1rem', position: 'fixed', top: 0, bottom: 0, left: 0,
-    transition: 'transform 0.25s var(--ease-out)', zIndex: 30,
+    width: SIDEBAR_W, flexShrink: 0, background: 'var(--d-bg)', borderRight: '1px solid var(--d-line)',
+    display: 'flex', flexDirection: 'column', padding: '24px 16px', position: 'fixed', top: 0, bottom: 0, left: 0,
+    transition: 'transform 0.25s var(--ease)', zIndex: 30,
   },
-  sideTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 0.5rem', marginBottom: '2rem' },
-  brand: { fontWeight: 800, letterSpacing: '0.12em', fontSize: '1rem' },
-  navList: { display: 'flex', flexDirection: 'column', gap: '0.25rem' },
-  navItem: {
-    display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.7rem 0.75rem',
-    background: 'transparent', border: 'none', borderRadius: 10, color: 'var(--text-dim)',
-    fontSize: '0.92rem', fontWeight: 500, width: '100%', textAlign: 'left', transition: 'all 0.15s var(--ease-out)',
-  },
-  navItemActive: { background: 'var(--surface-2)', color: 'var(--white)' },
-  streakCard: { background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem', marginBottom: '0.75rem' },
-  logout: {
-    display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.7rem 0.75rem', width: '100%',
-    background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500, borderRadius: 10,
-  },
+  sideTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 8px', marginBottom: 24 },
+  logo: { fontWeight: 800, letterSpacing: '0.12em', fontSize: '1rem' },
+  profile: { display: 'flex', gap: 12, alignItems: 'center', padding: '12px', background: 'var(--d-card)', borderRadius: 14, marginBottom: 20 },
+  avatar: { width: 40, height: 40, borderRadius: '50%', background: 'var(--d-line)', display: 'grid', placeItems: 'center', flexShrink: 0 },
+  navList: { display: 'flex', flexDirection: 'column', gap: 4 },
+  navItem: { display: 'flex', alignItems: 'center', gap: 12, padding: '11px 12px', background: 'transparent', border: 'none',
+    borderRadius: 12, color: 'var(--d-text-dim)', fontSize: '0.92rem', fontWeight: 500, width: '100%', textAlign: 'left', transition: 'all 0.15s var(--ease)' },
+  navItemActive: { background: 'var(--d-card)', color: 'var(--d-text)' },
+  logout: { display: 'flex', alignItems: 'center', gap: 10, padding: '11px 12px', width: '100%', background: 'transparent',
+    border: 'none', color: 'var(--d-text-muted)', fontSize: '0.88rem', fontWeight: 500, borderRadius: 12 },
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 20 },
-  main: { flex: 1, marginLeft: SIDEBAR_W, padding: '2.5rem clamp(1.25rem, 5vw, 3rem)', maxWidth: 820, width: '100%' },
-  mainHeader: { display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2.5rem' },
-  iconBtn: { background: 'transparent', border: 'none', color: 'var(--text-dim)', padding: 4, display: 'grid', placeItems: 'center' },
-  progressRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' },
-  bar: { height: 8, background: 'var(--surface-2)', borderRadius: 5, overflow: 'hidden', marginBottom: '2.5rem' },
-  sectionTitle: { marginBottom: '1rem', paddingBottom: '0.6rem', borderBottom: '1px solid var(--line)' },
+  main: { flex: 1, marginLeft: SIDEBAR_W, padding: '40px clamp(20px, 5vw, 56px)', maxWidth: 860, width: '100%' },
+  header: { display: 'flex', alignItems: 'center', gap: 16, marginBottom: 36, flexWrap: 'wrap' },
+  date: { color: 'var(--d-text-muted)', fontSize: '0.82rem', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 },
+  trialBadge: { display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 50,
+    background: 'rgba(0,113,227,0.12)', border: '1px solid var(--blue)', color: 'var(--blue)', fontSize: '0.8rem', fontWeight: 600, whiteSpace: 'nowrap' },
+  trialDot: { width: 7, height: 7, borderRadius: '50%', background: 'var(--blue)' },
+  statRow: { display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 36 },
+  streakCard: { flex: '1 1 140px', background: 'var(--d-card)', border: '1px solid var(--d-line)', borderRadius: 16, padding: 24 },
+  progCard: { flex: '2 1 220px', background: 'var(--d-card)', border: '1px solid var(--d-line)', borderRadius: 16, padding: 24, display: 'flex', flexDirection: 'column', justifyContent: 'center' },
+  bar: { height: 8, background: 'var(--d-bg)', borderRadius: 5, overflow: 'hidden' },
+  sectionTitle: { color: 'var(--d-text-muted)', marginBottom: 8, paddingBottom: 12, borderBottom: '1px solid var(--d-line)' },
+  icon: { background: 'transparent', border: 'none', color: 'var(--d-text-dim)', padding: 4, display: 'grid', placeItems: 'center' },
 }
