@@ -18,7 +18,7 @@ async def create_checkout_session(user_id: str, email: str, customer_id: str | N
     params = {
         "mode": "subscription",
         "line_items": [{"price": settings.stripe_price_id, "quantity": 1}],
-        "success_url": f"{settings.frontend_url}/onboard?checkout=success&session_id={{CHECKOUT_SESSION_ID}}",
+        "success_url": f"{settings.frontend_url}/dashboard?checkout=success&session_id={{CHECKOUT_SESSION_ID}}",
         "cancel_url": f"{settings.frontend_url}/?checkout=cancelled",
         # client_reference_id lets the webhook map the session back to our user
         "client_reference_id": user_id,

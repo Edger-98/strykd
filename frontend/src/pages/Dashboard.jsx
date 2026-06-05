@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   LayoutGrid, Flame, Radio, ExternalLink, LogOut, Target, Menu, X,
+  PartyPopper,
 } from 'lucide-react'
 import Checklist from '../components/Checklist'
 import ReplanPanel from '../components/ReplanPanel'
@@ -11,10 +12,20 @@ import { api, clearToken, getToken } from '../api'
 
 export default function Dashboard() {
   const nav = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [tab, setTab] = useState('today') // 'today' | 'signal'
   const [navOpen, setNavOpen] = useState(false)
+  // Show the welcome banner once when Stripe redirects back with ?checkout=success
+  const [welcome, setWelcome] = useState(() => searchParams.get('checkout') === 'success')
+
+  useEffect(() => {
+    // Strip the checkout query params so the banner doesn't reappear on refresh
+    if (searchParams.get('checkout')) {
+      setSearchParams({}, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
 
   const load = useCallback(() => {
     api.dashboard().then(setData).catch(e => {
@@ -78,6 +89,18 @@ export default function Dashboard() {
 
       {/* ── Main ── */}
       <main className="dash-main" style={S.main}>
+        {welcome && (
+          <div className="anim-up" style={S.welcome}>
+            <PartyPopper size={20} color="var(--blue)" style={{ flexShrink: 0 }} />
+            <span style={{ flex: 1 }}>
+              <strong>Your free week has started.</strong> No charge for 7 days —
+              cancel anytime. Now show up, check off, and don't break the streak.
+            </span>
+            <button onClick={() => setWelcome(false)} style={S.welcomeClose} aria-label="Dismiss">
+              <X size={16} />
+            </button>
+          </div>
+        )}
         <header style={S.mainHeader}>
           <button className="dash-menu-btn" style={S.iconBtn} onClick={() => setNavOpen(true)}><Menu size={20} /></button>
           <div className="anim-up">
@@ -153,6 +176,16 @@ function Centered({ children }) {
 const SIDEBAR_W = 248
 const S = {
   shell: { minHeight: '100vh', background: 'var(--black)', display: 'flex' },
+  welcome: {
+    display: 'flex', alignItems: 'center', gap: '0.85rem', padding: '1rem 1.25rem',
+    marginBottom: '2rem', borderRadius: 14, lineHeight: 1.5, fontSize: '0.92rem',
+    color: 'var(--white)', background: 'rgba(0,212,255,0.08)',
+    border: '1px solid var(--blue)',
+  },
+  welcomeClose: {
+    flexShrink: 0, background: 'transparent', border: 'none', color: 'var(--text-dim)',
+    display: 'grid', placeItems: 'center', padding: 4,
+  },
   sidebar: {
     width: SIDEBAR_W, flexShrink: 0, background: 'var(--surface)', borderRight: '1px solid var(--line)',
     display: 'flex', flexDirection: 'column', padding: '1.5rem 1rem', position: 'fixed', top: 0, bottom: 0, left: 0,
