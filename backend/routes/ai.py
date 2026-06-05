@@ -9,13 +9,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
-from deps import get_current_user
 from models.goal import Goal
 from models.task import DailyTask
 from models.theme import Theme
 from models.user import User
 from services.cache import bust_public_page
 from services.llm import stream_replan
+from trial import require_active_access
 
 router = APIRouter(prefix="/replan", tags=["ai"])
 
@@ -39,7 +39,7 @@ class ReplanConfirmRequest(BaseModel):
 async def replan(
     body: ReplanRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_active_access),
 ):
     today = date.today()
 
@@ -86,7 +86,7 @@ async def replan(
 async def replan_confirm(
     body: ReplanConfirmRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_active_access),
 ):
     try:
         goal_id = uuid.UUID(body.goal_id)

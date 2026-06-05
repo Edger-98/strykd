@@ -7,13 +7,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from deps import get_current_user
-from models.billing import Billing
 from models.goal import Goal
 from models.signal_wall import SignalWall
 from models.task import DailyTask
 from models.theme import Theme
 from models.user import User
 from services.cache import bust_public_page, get_public_page, set_public_page
+from trial import require_active_access, trial_status
 
 router = APIRouter(tags=["dashboard"])
 
@@ -133,12 +133,8 @@ async def get_dashboard(
     data["user"]["email"] = current_user.email
     data["user"]["subscription_active"] = current_user.subscription_active
 
-    # Trial end (next billing date) drives the "free week active" badge
-    billing = await db.scalar(select(Billing).where(Billing.user_id == current_user.id))
-    data["user"]["trial_ends"] = (
-        billing.next_billing_date.isoformat()
-        if billing and billing.next_billing_date else None
-    )
+    # App-side trial status drives the day-6 banner and day-8 lock screen
+    data["trial"] = trial_status(current_user)
 
     # Include completed_at for private dashboard
     today = date.today()
@@ -174,7 +170,7 @@ async def get_dashboard(
 async def complete_task(
     task_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_active_access),
 ):
     try:
         tid = uuid.UUID(task_id)

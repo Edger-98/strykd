@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   LayoutGrid, Radio, ExternalLink, LogOut, Menu, X, User as UserIcon,
+  CreditCard, Lock, Flame, ArrowRight, Loader2, PartyPopper,
 } from 'lucide-react'
 import Checklist from '../components/Checklist'
 import ReplanPanel from '../components/ReplanPanel'
@@ -18,6 +19,21 @@ export default function Dashboard() {
   const [error, setError] = useState('')
   const [tab, setTab] = useState('today')
   const [navOpen, setNavOpen] = useState(false)
+  const [subBusy, setSubBusy] = useState(false)
+  const [subError, setSubError] = useState('')
+  // captured once on mount, before the strip effect clears them
+  const [justSubscribed] = useState(() => searchParams.get('checkout') === 'success')
+  const [welcome] = useState(() => searchParams.get('welcome') === '1')
+  const [bannerDismissed, setBannerDismissed] = useState(false)
+
+  const subscribe = async () => {
+    setSubBusy(true); setSubError('')
+    try {
+      const { checkout_url } = await api.checkout()
+      if (checkout_url) window.location.href = checkout_url
+      else { setSubBusy(false); setSubError('Could not start checkout. Please try again.') }
+    } catch (e) { setSubBusy(false); setSubError(e.message) }
+  }
 
   const load = useCallback(() => {
     api.dashboard().then(setData).catch(e => {
@@ -32,7 +48,9 @@ export default function Dashboard() {
   }, [load, nav])
 
   useEffect(() => {
-    if (searchParams.get('checkout')) setSearchParams({}, { replace: true })
+    if (searchParams.get('checkout') || searchParams.get('welcome')) {
+      setSearchParams({}, { replace: true })
+    }
   }, [searchParams, setSearchParams])
 
   const onTaskComplete = (taskId, newStreak) => {
@@ -46,15 +64,22 @@ export default function Dashboard() {
   if (error) return <Centered>{error}</Centered>
   if (!data) return <Centered>Loading…</Centered>
 
-  const { user, goals, today_tasks, signal_wall } = data
+  const { user, goals, today_tasks, signal_wall, trial } = data
   const goalId = goals?.[0]?.id
   const taskDate = today_tasks?.[0]?.task_date || new Date().toISOString().slice(0, 10)
   const done = today_tasks.filter(t => t.completed).length
   const total = today_tasks.length
   const pct = total ? Math.round((done / total) * 100) : 0
 
-  const daysLeft = trialDaysLeft(user.trial_ends)
-  const showTrial = user.subscription_active
+  // Day 8+ with no subscription → full-screen upgrade lock (unless they just paid)
+  if (trial?.locked && !justSubscribed) {
+    return <UpgradePrompt user={user} subscribe={subscribe} busy={subBusy} error={subError}
+      onLogout={() => { clearToken(); nav('/') }} />
+  }
+
+  const subscribed = trial?.subscription_active || justSubscribed
+  const endingSoon = trial?.ending_soon && !subscribed
+  const daysLeft = trial?.days_left
 
   return (
     <div style={S.shell}>
@@ -103,13 +128,42 @@ export default function Dashboard() {
             </p>
             <h1 className="h-lg display" style={{ marginTop: 6 }}>Hello, {user.name.split(' ')[0]}</h1>
           </div>
-          {showTrial && (
-            <span style={S.trialBadge}>
-              <span style={S.trialDot} />
-              Free week active{daysLeft != null ? ` — ${daysLeft} day${daysLeft === 1 ? '' : 's'} remaining` : ''}
+          {subscribed ? (
+            <span style={{ ...S.trialBadge, color: '#34C759', borderColor: '#34C759', background: 'rgba(52,199,89,0.12)' }}>
+              <span style={{ ...S.trialDot, background: '#34C759' }} /> Subscribed
             </span>
-          )}
+          ) : !endingSoon && daysLeft != null ? (
+            <span style={S.trialBadge}>
+              <span style={S.trialDot} /> Free trial · {daysLeft} day{daysLeft === 1 ? '' : 's'} left
+            </span>
+          ) : null}
         </header>
+
+        {/* Day-6/7 persistent banner */}
+        {endingSoon && (
+          <motion.div style={S.endBanner} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
+              <Flame size={20} color="var(--red)" style={{ flexShrink: 0 }} />
+              <span><strong>Your free week ends tomorrow</strong> — keep your streak alive.</span>
+            </span>
+            <button className="pill pill-blue pill-sm" onClick={subscribe} disabled={subBusy} style={{ flexShrink: 0 }}>
+              {subBusy ? <Loader2 size={15} className="spin-icon" /> : <><CreditCard size={15} /> Subscribe for $9/month</>}
+            </button>
+          </motion.div>
+        )}
+
+        {/* One-time welcome / subscribed confirmation */}
+        {(welcome || justSubscribed) && !bannerDismissed && (
+          <motion.div style={S.welcomeBanner} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
+            <PartyPopper size={18} color="var(--blue)" style={{ flexShrink: 0 }} />
+            <span style={{ flex: 1 }}>
+              {justSubscribed
+                ? <><strong>You're subscribed.</strong> Thanks for backing yourself — keep showing up.</>
+                : <><strong>Your free week has started.</strong> Full access, no card. Now show up and don't break the streak.</>}
+            </span>
+            <button onClick={() => setBannerDismissed(true)} style={S.icon} aria-label="Dismiss"><X size={16} /></button>
+          </motion.div>
+        )}
 
         {tab === 'today' ? (
           <div>
@@ -171,11 +225,39 @@ function Centered({ children }) {
   )
 }
 
-function trialDaysLeft(iso) {
-  if (!iso) return null
-  const ms = new Date(iso).getTime() - Date.now()
-  if (Number.isNaN(ms)) return null
-  return Math.max(0, Math.ceil(ms / 86400000))
+function UpgradePrompt({ user, subscribe, busy, error, onLogout }) {
+  return (
+    <div style={S.lockShell}>
+      <motion.div style={S.lockCard} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}>
+        <div style={S.lockIcon}><Lock size={26} color="var(--red)" /></div>
+        <h1 className="h-lg display" style={{ marginBottom: 12 }}>Your free week has ended.</h1>
+        <p style={{ color: 'var(--d-text-dim)', fontSize: '1.05rem', lineHeight: 1.55, marginBottom: 8 }}>
+          {user.streak_days > 0
+            ? <>Don't lose your <strong style={{ color: 'var(--red)' }}>{user.streak_days}-day streak</strong>. Subscribe to keep your plan, your AI coach, and your momentum.</>
+            : <>Subscribe to unlock your daily plan, your AI coach, and keep your momentum going.</>}
+        </p>
+        <p style={{ color: 'var(--d-text-muted)', fontSize: '0.9rem', marginBottom: 28 }}>
+          Just $9/month. Your public page stays live either way.
+        </p>
+
+        {error && <p style={{ color: 'var(--red)', fontSize: '0.88rem', marginBottom: 16 }}>{error}</p>}
+
+        <button className="pill pill-blue pill-lg" onClick={subscribe} disabled={busy} style={{ width: '100%' }}>
+          {busy ? <Loader2 size={18} className="spin-icon" /> : <><CreditCard size={18} /> Subscribe for $9/month <ArrowRight size={16} /></>}
+        </button>
+
+        <div style={S.lockFoot}>
+          {user.page_public !== false && (
+            <a href={`/${user.slug}`} target="_blank" rel="noreferrer" style={S.lockLink}>
+              <ExternalLink size={14} /> View your public page
+            </a>
+          )}
+          <button onClick={onLogout} style={S.lockLink}><LogOut size={14} /> Log out</button>
+        </div>
+      </motion.div>
+    </div>
+  )
 }
 
 const SIDEBAR_W = 260
@@ -203,6 +285,16 @@ const S = {
   trialBadge: { display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 50,
     background: 'rgba(0,113,227,0.12)', border: '1px solid var(--blue)', color: 'var(--blue)', fontSize: '0.8rem', fontWeight: 600, whiteSpace: 'nowrap' },
   trialDot: { width: 7, height: 7, borderRadius: '50%', background: 'var(--blue)' },
+  endBanner: { display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', padding: '14px 20px', marginBottom: 24,
+    borderRadius: 14, background: 'rgba(255,45,45,0.08)', border: '1px solid rgba(255,45,45,0.4)', color: 'var(--d-text)', fontSize: '0.92rem' },
+  welcomeBanner: { display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', marginBottom: 24,
+    borderRadius: 14, background: 'rgba(0,113,227,0.1)', border: '1px solid var(--blue)', color: 'var(--d-text)', fontSize: '0.9rem', lineHeight: 1.5 },
+  lockShell: { minHeight: '100vh', background: 'var(--d-bg)', display: 'grid', placeItems: 'center', padding: 24 },
+  lockCard: { width: '100%', maxWidth: 460, background: 'var(--d-panel)', border: '1px solid var(--d-line)', borderRadius: 24,
+    padding: 'clamp(28px, 5vw, 44px)', textAlign: 'center', color: 'var(--d-text)' },
+  lockIcon: { width: 60, height: 60, borderRadius: 18, background: 'rgba(255,45,45,0.12)', display: 'grid', placeItems: 'center', margin: '0 auto 24px' },
+  lockFoot: { display: 'flex', justifyContent: 'center', gap: 24, marginTop: 24, flexWrap: 'wrap' },
+  lockLink: { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: 'var(--d-text-muted)', fontSize: '0.85rem', fontWeight: 500 },
   statRow: { display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 36 },
   streakCard: { flex: '1 1 140px', background: 'var(--d-card)', border: '1px solid var(--d-line)', borderRadius: 16, padding: 24 },
   progCard: { flex: '2 1 220px', background: 'var(--d-card)', border: '1px solid var(--d-line)', borderRadius: 16, padding: 24, display: 'flex', flexDirection: 'column', justifyContent: 'center' },

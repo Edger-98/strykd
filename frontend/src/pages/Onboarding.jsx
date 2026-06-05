@@ -169,10 +169,9 @@ export default function Onboarding() {
   const submit = async () => {
     setBusy(true); setError('')
     try {
+      // Save the plan and start the 7-day free trial — no payment, straight to dashboard
       await api.onboard({ ...form, duration_days: Number(form.duration_days), hours_per_day: Number(form.hours_per_day) })
-      const { checkout_url } = await api.checkout()
-      if (!checkout_url) throw new Error('Could not start checkout. Please try again.')
-      window.location.href = checkout_url
+      nav('/dashboard?welcome=1')
     } catch (err) { setError(err.message); setBusy(false) }
   }
 

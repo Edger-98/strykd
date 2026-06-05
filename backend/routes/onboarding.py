@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -41,9 +41,8 @@ async def onboard(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # No subscription gate here: onboarding (and plan generation) happens BEFORE
-    # the user starts their 7-day free trial via Stripe checkout. The trial-first
-    # flow is: onboard -> POST /billing/checkout -> Stripe -> subscription active.
+    # No payment required: completing onboarding starts a 7-day, no-card free
+    # trial. Access is gated only AFTER the trial (see trial.require_active_access).
 
     if body.duration_days < 1 or body.duration_days > 365:
         raise HTTPException(status_code=422, detail="duration_days must be between 1 and 365")
@@ -68,6 +67,10 @@ async def onboard(
 
     # Honor the public/private page toggle
     current_user.page_public = body.page_public
+
+    # Start the 7-day free trial clock on first onboarding
+    if current_user.trial_start_date is None:
+        current_user.trial_start_date = datetime.now(timezone.utc)
 
     # Persist Goal with the full onboarding context
     goal = Goal(
