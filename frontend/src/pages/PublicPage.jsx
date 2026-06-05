@@ -89,7 +89,7 @@ export default function PublicPage() {
             <div className="card" style={{ padding: 32 }}>
               <p style={{ fontSize: '1.3rem', lineHeight: 1.4, fontWeight: 600, marginBottom: 14 }}>{goal.description}</p>
               <span style={{ fontSize: '0.78rem', color: 'var(--gray-light)', letterSpacing: '0.06em', fontWeight: 600 }}>
-                {goal.duration_days} DAYS · {goal.start_date} → {goal.end_date}
+                {goal.duration_days} DAYS · {goal.start_date} to {goal.end_date}
               </span>
             </div>
           </section></Reveal>

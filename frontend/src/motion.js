@@ -9,7 +9,7 @@ export const pageVariants = {
   exit: { opacity: 0, y: -8, transition: { duration: 0.3, ease: easeOut } },
 }
 
-// Section entrance (scroll reveal) — use with whileInView
+// Section entrance (scroll reveal), use with whileInView
 export const revealVariants = {
   hidden: { opacity: 0, y: 30 },
   show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: easeOut } },

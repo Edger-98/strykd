@@ -79,7 +79,7 @@ export default function Onboarding() {
         placeholder="e.g. I start strong then get paralyzed by perfectionism…"
         value={form.past_blockers} onChange={e => set('past_blockers', e.target.value)} /> },
 
-    { key: 'cadence', q: 'How much can you commit?', sub: 'Your plan is sized to fit — no impossible schedules.',
+    { key: 'cadence', q: 'How much can you commit?', sub: 'Your plan is sized to fit. No impossible schedules.',
       valid: () => form.duration_days >= 1 && form.hours_per_day >= 1,
       render: () => (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -169,7 +169,7 @@ export default function Onboarding() {
   const submit = async () => {
     setBusy(true); setError('')
     try {
-      // Save the plan and start the 7-day free trial — no payment, straight to dashboard
+      // Save the plan and start the 7-day free trial, no payment, straight to dashboard
       await api.onboard({ ...form, duration_days: Number(form.duration_days), hours_per_day: Number(form.hours_per_day) })
       nav('/dashboard?welcome=1')
     } catch (err) { setError(err.message); setBusy(false) }
@@ -221,7 +221,7 @@ export default function Onboarding() {
                 </button>
               </div>
               {isLast && <p style={St.trial}>No charge for 7 days. Cancel anytime.</p>}
-              {cur.text && <p style={St.hint}>Press ⌘/Ctrl + Enter to continue</p>}
+              {cur.text && <p style={St.hint}>Press Cmd/Ctrl + Enter to continue</p>}
             </motion.div>
           </AnimatePresence>
         </div>

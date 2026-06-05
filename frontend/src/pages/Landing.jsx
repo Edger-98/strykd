@@ -13,7 +13,7 @@ const BAND_PHOTO = 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d
 
 const STEPS = [
   { n: '01', t: 'Tell us your goal', d: 'Answer a few honest questions about what you want and what has stopped you before.' },
-  { n: '02', t: 'AI builds your plan', d: 'Get a personalized day-by-day plan, a visual identity, and a live page — in seconds.' },
+  { n: '02', t: 'AI builds your plan', d: 'Get a personalized day-by-day plan, a visual identity, and a live page in seconds.' },
   { n: '03', t: 'Show up daily', d: 'Check off tasks, keep your streak alive, and replan with AI whenever life shifts.' },
 ]
 
@@ -38,7 +38,7 @@ const REVIEWS = [
 const FEATURES = [
   { Icon: Sparkles, t: 'AI-built daily plans', d: 'A coach that turns any goal into concrete daily tasks, tuned to your hours and your blockers.' },
   { Icon: TrendingUp, t: 'Streaks that hold you', d: 'A streak counter and signal wall that make not showing up feel like a real loss.' },
-  { Icon: Globe, t: 'Your own live page', d: 'A shareable page on your own subdomain — your mission, progress, and daily wins, public or private.' },
+  { Icon: Globe, t: 'Your own live page', d: 'A shareable page on your own subdomain, with your mission, progress, and daily wins, public or private.' },
   { Icon: Zap, t: 'Replan in real time', d: 'Life shifts. Tell the AI what changed and watch your plan rewrite itself, live.' },
 ]
 
@@ -91,7 +91,7 @@ export default function Landing() {
           </motion.h1>
           <motion.p className="lead" style={{ maxWidth: 560, margin: '28px auto 0' }}
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.12, ease: [0.16, 1, 0.3, 1] }}>
-            Strykd turns what you want into a daily plan you actually follow — with an AI coach,
+            Strykd turns what you want into a daily plan you actually follow, with an AI coach,
             a streak that holds you, and a live page that makes it real.
           </motion.p>
           <motion.div style={S.heroCtas}
@@ -169,7 +169,7 @@ export default function Landing() {
           <motion.div style={S.featGrid} variants={staggerContainer(0.1)} initial="hidden" whileInView="show" viewport={inView}>
             {FEATURES.map(f => (
               <motion.div key={f.t} className="card" style={S.featCard} variants={staggerItem}>
-                <div style={S.featIcon}><f.Icon size={24} color="var(--blue)" /></div>
+                <f.Icon size={28} color="var(--black)" strokeWidth={1.75} style={{ marginBottom: 20 }} />
                 <h3 className="h-md" style={{ fontWeight: 700, margin: '4px 0 10px' }}>{f.t}</h3>
                 <p className="lead" style={{ fontSize: '1.02rem' }}>{f.d}</p>
               </motion.div>
@@ -273,7 +273,6 @@ const S = {
   avatar: { width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 },
   featGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 24 },
   featCard: { padding: 40 },
-  featIcon: { width: 52, height: 52, borderRadius: 14, background: 'rgba(0,113,227,0.1)', display: 'grid', placeItems: 'center', marginBottom: 20 },
   footer: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 },
   authCard: { width: '100%', maxWidth: 440, padding: 'clamp(28px, 5vw, 44px)' },
   authBack: { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: 'var(--gray-text)',

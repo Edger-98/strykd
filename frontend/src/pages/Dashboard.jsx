@@ -71,7 +71,7 @@ export default function Dashboard() {
   const total = today_tasks.length
   const pct = total ? Math.round((done / total) * 100) : 0
 
-  // Day 8+ with no subscription → full-screen upgrade lock (unless they just paid)
+  // Day 8+ with no subscription, full-screen upgrade lock (unless they just paid)
   if (trial?.locked && !justSubscribed) {
     return <UpgradePrompt user={user} subscribe={subscribe} busy={subBusy} error={subError}
       onLogout={() => { clearToken(); nav('/') }} />
@@ -144,7 +144,7 @@ export default function Dashboard() {
           <motion.div style={S.endBanner} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
               <Flame size={20} color="var(--red)" style={{ flexShrink: 0 }} />
-              <span><strong>Your free week ends tomorrow</strong> — keep your streak alive.</span>
+              <span><strong>Your free week ends tomorrow.</strong> Keep your streak alive.</span>
             </span>
             <button className="pill pill-blue pill-sm" onClick={subscribe} disabled={subBusy} style={{ flexShrink: 0 }}>
               {subBusy ? <Loader2 size={15} className="spin-icon" /> : <><CreditCard size={15} /> Subscribe for $9/month</>}
@@ -158,7 +158,7 @@ export default function Dashboard() {
             <PartyPopper size={18} color="var(--blue)" style={{ flexShrink: 0 }} />
             <span style={{ flex: 1 }}>
               {justSubscribed
-                ? <><strong>You're subscribed.</strong> Thanks for backing yourself — keep showing up.</>
+                ? <><strong>You're subscribed.</strong> Thanks for backing yourself. Keep showing up.</>
                 : <><strong>Your free week has started.</strong> Full access, no card. Now show up and don't break the streak.</>}
             </span>
             <button onClick={() => setBannerDismissed(true)} style={S.icon} aria-label="Dismiss"><X size={16} /></button>
