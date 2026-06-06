@@ -4,6 +4,8 @@ import { motion } from 'framer-motion'
 import { Flame, ArrowDown, Check, Link2, Share2, Heart, Send, Loader2, Play } from 'lucide-react'
 import SignalWall from '../components/SignalWall'
 import Avatar from '../components/Avatar'
+import ContributionGrid from '../components/ContributionGrid'
+import DayDrawer from '../components/DayDrawer'
 import { inView, revealVariants } from '../motion'
 import { api } from '../api'
 
@@ -18,6 +20,7 @@ export default function PublicPage() {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
+  const [gridDay, setGridDay] = useState(null)
 
   useEffect(() => {
     api.publicPage(slug).then(setData).catch(() => setError('This page does not exist.'))
@@ -84,7 +87,7 @@ export default function PublicPage() {
 
       {/* ── Goal sections ── */}
       <div className="container-narrow" style={{ padding: '0 24px 100px' }}>
-        {goals.map((g, i) => <GoalSection key={g.id} goal={g} t={t} first={i === 0} />)}
+        {goals.map((g, i) => <GoalSection key={g.id} goal={g} t={t} first={i === 0} onPickDay={setGridDay} />)}
 
         {/* Signal Wall */}
         <Reveal><section style={{ marginTop: 80 }}>
@@ -104,11 +107,13 @@ export default function PublicPage() {
           <span style={S.poweredBadge}><Share2 size={13} /> Powered by <strong style={{ marginLeft: 3 }}>Strykd</strong></span>
         </div>
       </div>
+
+      <DayDrawer day={gridDay} onClose={() => setGridDay(null)} dark={false} accent={t.accent} />
     </div>
   )
 }
 
-function GoalSection({ goal, t, first }) {
+function GoalSection({ goal, t, first, onPickDay }) {
   const p = goal.progress || { pct: 0, day: 1, total_days: goal.duration_days }
   const currentWeek = Math.floor((p.day - 1) / 7)
   return (
@@ -124,6 +129,16 @@ function GoalSection({ goal, t, first }) {
           </div>
           <ProgressArc pct={p.pct} accent={t.accent} />
         </div>
+
+        {/* contribution grid — the story at a glance */}
+        {goal.grid?.length > 0 && (
+          <div style={{ marginTop: 28 }}>
+            <p style={{ fontSize: '0.72rem', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gray-light)', marginBottom: 14 }}>
+              THE STORY SO FAR
+            </p>
+            <ContributionGrid days={goal.grid} square={16} gap={4} dark={false} onPickDay={onPickDay} />
+          </div>
+        )}
 
         {/* chapter timeline */}
         {goal.chapter_titles?.length > 0 && (

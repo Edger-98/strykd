@@ -14,6 +14,7 @@ from models.signal_wall import SignalWall
 from models.task import DailyTask
 from models.theme import Theme
 from models.user import User
+from routes.dashboard import build_grid
 from services.cache import bust_public_page
 from services.llm import generate_projected_outcome
 from trial import require_active_access
@@ -172,3 +173,29 @@ async def update_goal(
     await db.refresh(goal)
     await bust_public_page(current_user.slug)
     return {"id": str(goal.id), "status": goal.status, "page_public": goal.page_public}
+
+
+@router.get("/goals/{goal_id}/grid")
+async def goal_grid(
+    goal_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Daily completion stats for every day in the goal period (contribution grid)."""
+    try:
+        gid = uuid.UUID(goal_id)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid goal ID")
+    goal = await db.scalar(
+        select(Goal).where(Goal.id == gid, Goal.user_id == current_user.id)
+    )
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+
+    days = await build_grid(goal, db, date.today())
+    return {
+        "goal_id": str(goal.id),
+        "start_date": _d(goal.start_date),
+        "duration_days": goal.duration_days,
+        "days": days,
+    }

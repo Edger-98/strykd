@@ -10,6 +10,8 @@ import ReplanPanel from '../components/ReplanPanel'
 import SignalWall from '../components/SignalWall'
 import DashSidebar, { SIDEBAR_W } from '../components/DashSidebar'
 import AddGoalModal from '../components/AddGoalModal'
+import ContributionGrid from '../components/ContributionGrid'
+import DayDrawer from '../components/DayDrawer'
 import { useCountUp } from '../hooks'
 import { pageVariants } from '../motion'
 import { api, clearToken, getToken } from '../api'
@@ -33,6 +35,7 @@ export default function Dashboard() {
   const [addOpen, setAddOpen] = useState(false)
   const [quickInput, setQuickInput] = useState('')
   const [quickBusy, setQuickBusy] = useState(false)
+  const [gridDay, setGridDay] = useState(null)
 
   const subscribe = async () => {
     setSubBusy(true); setSubError('')
@@ -199,6 +202,13 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {activeGoal?.grid?.length > 0 && (
+              <section style={{ marginBottom: 36 }}>
+                <h2 className="eyebrow" style={S.sectionTitle}>Consistency</h2>
+                <ContributionGrid days={activeGoal.grid} dark onPickDay={setGridDay} />
+              </section>
+            )}
+
             {activeGoal ? (
               <>
                 <h2 className="eyebrow" style={S.sectionTitle}>Today's Tasks</h2>
@@ -238,6 +248,7 @@ export default function Dashboard() {
       </motion.main>
 
       <AddGoalModal open={addOpen} onClose={() => setAddOpen(false)} onAdded={load} />
+      <DayDrawer day={gridDay} onClose={() => setGridDay(null)} dark accent="var(--red)" />
     </div>
   )
 }

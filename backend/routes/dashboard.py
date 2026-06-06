@@ -41,6 +41,51 @@ def _task_dict(t: DailyTask, detailed: bool = False) -> dict:
     return out
 
 
+async def build_grid(goal: Goal, db: AsyncSession, today: date) -> list[dict]:
+    """One entry per day of the goal: completion stats plus that day's tasks and
+    signal entry (so the contribution grid and day drawer share one payload)."""
+    res = await db.execute(
+        select(DailyTask).where(DailyTask.goal_id == goal.id)
+        .order_by(DailyTask.sort_order, DailyTask.id)
+    )
+    by_date: dict[date, list[DailyTask]] = {}
+    for t in res.scalars().all():
+        by_date.setdefault(t.task_date, []).append(t)
+
+    sw_res = await db.execute(select(SignalWall).where(SignalWall.goal_id == goal.id))
+    sig_by_date = {sw.entry_date: sw for sw in sw_res.scalars().all()}
+
+    days: list[dict] = []
+    for i in range(goal.duration_days):
+        d = goal.start_date + timedelta(days=i)
+        tasks = by_date.get(d, [])
+        total = len(tasks)
+        done = sum(1 for t in tasks if t.completed)
+        proof = next((t.proof_url for t in tasks if t.proof_url), None)
+        sw = sig_by_date.get(d)
+        days.append({
+            "date": _d(d),
+            "day_number": i + 1,
+            "tasks_total": total,
+            "tasks_completed": done,
+            "pct": round(done / total * 100) if total else 0,
+            "completed": total > 0 and done == total,
+            "is_today": d == today,
+            "is_past": d < today,
+            "is_future": d > today,
+            "proof_url": proof,
+            "is_video": bool(proof and proof.lower().endswith(".mp4")),
+            "tasks": [
+                {"content": t.content, "completed": t.completed,
+                 "voice_style": t.voice_style, "proof_url": t.proof_url}
+                for t in tasks
+            ],
+            "signal": {"ai_summary": sw.ai_summary, "tasks_completed": sw.tasks_completed,
+                       "tasks_total": sw.tasks_total} if sw else None,
+        })
+    return days
+
+
 async def _goal_section(goal: Goal, db: AsyncSession, today: date, detailed: bool) -> dict:
     # today's tasks for this goal
     res = await db.execute(
@@ -94,6 +139,7 @@ async def _goal_section(goal: Goal, db: AsyncSession, today: date, detailed: boo
                      "tasks_completed": done, "tasks_total": total},
         "today_tasks": [_task_dict(t, detailed) for t in today_tasks],
         "proofs": proofs,
+        "grid": await build_grid(goal, db, today),
     }
 
 
