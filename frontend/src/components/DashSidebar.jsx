@@ -1,11 +1,11 @@
 import { useNavigate } from 'react-router-dom'
-import { LayoutGrid, Map, Radio, ExternalLink, LogOut, X, User as UserIcon } from 'lucide-react'
+import { LayoutGrid, Map, Radio, ExternalLink, LogOut, X, Plus, User as UserIcon } from 'lucide-react'
 
 /**
  * Shared dark dashboard sidebar used by the Dashboard and Journey pages.
  * `active` is one of: 'today' | 'journey' | 'signal'.
  */
-export default function DashSidebar({ user, active, navOpen, setNavOpen, onLogout }) {
+export default function DashSidebar({ user, active, navOpen, setNavOpen, onLogout, onAddGoal }) {
   const nav = useNavigate()
   const go = path => { setNavOpen(false); nav(path) }
 
@@ -35,6 +35,12 @@ export default function DashSidebar({ user, active, navOpen, setNavOpen, onLogou
             </a>
           )}
         </nav>
+
+        {onAddGoal && (
+          <button onClick={() => { setNavOpen(false); onAddGoal() }} style={S.addGoal}>
+            <Plus size={17} /> Add another goal
+          </button>
+        )}
 
         <div style={{ marginTop: 'auto' }}>
           <button style={S.logout} onClick={onLogout}><LogOut size={16} /> Log out</button>
@@ -70,6 +76,9 @@ const S = {
   navItem: { display: 'flex', alignItems: 'center', gap: 12, padding: '11px 12px', background: 'transparent', border: 'none',
     borderRadius: 12, color: 'var(--d-text-dim)', fontSize: '0.92rem', fontWeight: 500, width: '100%', textAlign: 'left', transition: 'all 0.15s var(--ease)' },
   navItemActive: { background: 'var(--d-card)', color: 'var(--d-text)' },
+  addGoal: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 16, padding: '11px 12px',
+    width: '100%', background: 'transparent', border: '1px dashed var(--d-line)', borderRadius: 12,
+    color: 'var(--d-text-dim)', fontSize: '0.88rem', fontWeight: 600, transition: 'all 0.15s var(--ease)' },
   logout: { display: 'flex', alignItems: 'center', gap: 10, padding: '11px 12px', width: '100%', background: 'transparent',
     border: 'none', color: 'var(--d-text-muted)', fontSize: '0.88rem', fontWeight: 500, borderRadius: 12 },
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 20 },

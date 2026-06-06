@@ -13,6 +13,7 @@ class SignalWall(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    goal_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("goals.id"), nullable=True)  # per-goal entries
     entry_date: Mapped[date] = mapped_column(Date, nullable=False)
     ai_summary: Mapped[str] = mapped_column(Text, nullable=False)
     tasks_completed: Mapped[int] = mapped_column(Integer, default=0)

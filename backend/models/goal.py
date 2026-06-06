@@ -2,7 +2,7 @@ import uuid
 from datetime import date
 
 from sqlalchemy import Date, ForeignKey, Integer, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
@@ -25,6 +25,14 @@ class Goal(Base):
     past_blockers: Mapped[str | None] = mapped_column(Text, nullable=True)
     hours_per_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
     daily_rhythm: Mapped[str | None] = mapped_column(String, nullable=True)  # morning | evening
+
+    # Per-goal streak (each goal tracks its own daily check-in streak)
+    streak_days: Mapped[int] = mapped_column(Integer, default=0)
+    last_checkin: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+    # Per-goal narrative (each goal has its own chapter timeline + projected outcome)
+    chapter_titles: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    projected_outcome: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     user: Mapped["User"] = relationship("User", back_populates="goals")
     tasks: Mapped[list["DailyTask"]] = relationship("DailyTask", back_populates="goal", cascade="all, delete-orphan")

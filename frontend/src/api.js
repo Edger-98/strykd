@@ -31,6 +31,7 @@ export const api = {
   publicPage: slug => fetch(`${API}/public/${slug}`).then(r => r.ok ? r.json() : Promise.reject(r)),
 
   completeTask: id => req('PATCH', `/tasks/${id}/complete`),
+  addQuickTask: content => req('POST', '/tasks/quick', { content }),
 
   onboard: body => req('POST', '/onboarding', body),
 

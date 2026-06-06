@@ -5,6 +5,8 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
+from sqlalchemy import select
+
 from database import get_db
 from deps import get_current_user
 from models.goal import Goal
@@ -72,7 +74,7 @@ async def onboard(
     if current_user.trial_start_date is None:
         current_user.trial_start_date = datetime.now(timezone.utc)
 
-    # Persist Goal with the full onboarding context
+    # Persist Goal with its own chapter timeline (multiple active goals allowed)
     goal = Goal(
         user_id=current_user.id,
         description=body.goals,
@@ -85,11 +87,13 @@ async def onboard(
         past_blockers=body.past_blockers,
         hours_per_day=body.hours_per_day,
         daily_rhythm=body.daily_rhythm,
+        chapter_titles=plan.get("chapter_titles", []),
+        streak_days=0,
     )
     db.add(goal)
     await db.flush()  # populate goal.id before FK refs
 
-    # Persist DailyTasks
+    # Persist DailyTasks (carry user_id for ownership alongside goal_id)
     task_count_day1 = 0
     for day_entry in plan.get("daily_tasks", []):
         day_num = int(day_entry["day"])
@@ -98,6 +102,7 @@ async def onboard(
             db.add(
                 DailyTask(
                     goal_id=goal.id,
+                    user_id=current_user.id,
                     task_date=task_date,
                     content=task["content"],
                     voice_style=task.get("voice_style", "direct"),
@@ -106,23 +111,25 @@ async def onboard(
         if day_num == 1:
             task_count_day1 = len(day_entry.get("tasks", []))
 
-    # Persist Theme
-    theme_data = plan.get("theme", {})
-    db.add(
-        Theme(
-            user_id=current_user.id,
-            color_palette=theme_data.get("color_palette", "arctic-focus"),
-            typography_variant=theme_data.get("typography_variant", "minimal"),
-            layout_variant=theme_data.get("layout_variant", "dashboard"),
-            mission_statement=plan.get("mission_statement", ""),
-            chapter_titles=plan.get("chapter_titles", []),
+    # Theme is the user's single visual identity: create on first goal, reuse after
+    existing_theme = await db.scalar(select(Theme).where(Theme.user_id == current_user.id))
+    if existing_theme is None:
+        theme_data = plan.get("theme", {})
+        db.add(
+            Theme(
+                user_id=current_user.id,
+                color_palette=theme_data.get("color_palette", "arctic-focus"),
+                typography_variant=theme_data.get("typography_variant", "minimal"),
+                layout_variant=theme_data.get("layout_variant", "dashboard"),
+                mission_statement=plan.get("mission_statement", ""),
+            )
         )
-    )
 
-    # Persist Day 1 Signal Wall entry
+    # Day 1 Signal Wall entry, scoped to this goal
     db.add(
         SignalWall(
             user_id=current_user.id,
+            goal_id=goal.id,
             entry_date=today,
             ai_summary=plan.get("day_1_signal_wall_entry", ""),
             tasks_completed=0,

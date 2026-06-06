@@ -17,7 +17,7 @@ export default function Checklist({ tasks = [], onUpdate }) {
     setLoading(p => ({ ...p, [task.id]: true }))
     try {
       const res = await api.completeTask(task.id)
-      onUpdate && onUpdate(task.id, res.streak_days)
+      onUpdate && onUpdate(task.id, res)
     } catch (e) { console.error(e) }
     finally { setLoading(p => ({ ...p, [task.id]: false })) }
   }
