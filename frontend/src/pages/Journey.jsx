@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   Menu, X, MapPin, Check, Sparkles, TrendingUp, Calendar, ChevronDown, Plus, Flame,
+  Pause, Play, Eye, EyeOff, Loader2,
 } from 'lucide-react'
 import DashSidebar, { SIDEBAR_W } from '../components/DashSidebar'
 import AddGoalModal from '../components/AddGoalModal'
@@ -68,7 +69,7 @@ export default function Journey() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           {goals.map((g, i) => (
-            <GoalCard key={g.id} goal={g} index={i}
+            <GoalCard key={g.id} goal={g} index={i} reload={load}
               expanded={!!expanded[g.id]} onToggle={() => setExpanded(e => ({ ...e, [g.id]: !e[g.id] }))}
               onPickDay={setSelectedDay} />
           ))}
@@ -81,16 +82,30 @@ export default function Journey() {
   )
 }
 
-function GoalCard({ goal, index, expanded, onToggle, onPickDay }) {
+function GoalCard({ goal, index, expanded, onToggle, onPickDay, reload }) {
   const p = goal.progress
+  const paused = goal.status === 'paused'
+  const [busy, setBusy] = useState('')
+
+  const update = async (field, body) => {
+    setBusy(field)
+    try { await api.updateGoal(goal.id, body); reload() }
+    catch (e) { console.error(e); setBusy('') }
+  }
+  const togglePause = e => { e.stopPropagation(); update('pause', { status: paused ? 'active' : 'paused' }) }
+  const togglePublic = e => { e.stopPropagation(); update('public', { page_public: !goal.page_public }) }
+
   return (
     <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: index * 0.05 }}
-      style={S.goalCard}>
+      style={{ ...S.goalCard, borderLeftColor: paused ? 'var(--d-text-muted)' : 'var(--red)', opacity: paused ? 0.82 : 1 }}>
       {/* header (always visible, click to expand) */}
       <button onClick={onToggle} style={S.goalHead}>
-        <img src={imgFor(goal.life_area)} alt="" style={S.thumb} loading="lazy" />
+        <img src={imgFor(goal.life_area)} alt="" style={{ ...S.thumb, filter: paused ? 'grayscale(0.7)' : 'none' }} loading="lazy" />
         <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
-          <p style={S.goalEyebrow}>{(goal.life_area || 'goal').replace('-', ' ').toUpperCase()}</p>
+          <p style={S.goalEyebrow}>
+            {(goal.life_area || 'goal').replace('-', ' ').toUpperCase()}
+            {paused && <span style={S.pausedBadge}><Pause size={9} /> PAUSED</span>}
+          </p>
           <h2 className="display" style={S.goalTitle}>{goal.description}</h2>
           <p style={S.goalMeta}>
             Day {p.day} of {p.total_days}
@@ -103,6 +118,18 @@ function GoalCard({ goal, index, expanded, onToggle, onPickDay }) {
           <motion.span animate={{ rotate: expanded ? 180 : 0 }} style={{ display: 'grid' }}><ChevronDown size={20} color="var(--d-text-dim)" /></motion.span>
         </div>
       </button>
+
+      {/* controls */}
+      <div style={S.goalControls}>
+        <button onClick={togglePause} disabled={!!busy} style={S.ctrlBtn}>
+          {busy === 'pause' ? <Loader2 size={13} className="spin-icon" /> : paused ? <Play size={13} /> : <Pause size={13} />}
+          {paused ? 'Resume' : 'Pause'}
+        </button>
+        <button onClick={togglePublic} disabled={!!busy} style={S.ctrlBtn}>
+          {busy === 'public' ? <Loader2 size={13} className="spin-icon" /> : goal.page_public ? <Eye size={13} /> : <EyeOff size={13} />}
+          {goal.page_public ? 'Public' : 'Private'}
+        </button>
+      </div>
 
       <AnimatePresence initial={false}>
         {expanded && (
@@ -240,6 +267,9 @@ const S = {
   sectionTitle: { color: 'var(--d-text-muted)', marginBottom: 14, paddingBottom: 10, borderBottom: '1px solid var(--d-line)' },
 
   goalCard: { background: 'var(--d-card)', borderRadius: 18, border: '1px solid var(--d-line)', borderLeft: '3px solid var(--red)', overflow: 'hidden' },
+  pausedBadge: { display: 'inline-flex', alignItems: 'center', gap: 3, marginLeft: 8, fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--d-text-muted)', border: '1px solid var(--d-text-muted)', borderRadius: 50, padding: '2px 7px', verticalAlign: 1 },
+  goalControls: { display: 'flex', gap: 10, padding: '0 18px 16px', flexWrap: 'wrap' },
+  ctrlBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 50, background: 'var(--d-bg)', border: '1px solid var(--d-line)', color: 'var(--d-text-dim)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' },
   goalHead: { display: 'flex', alignItems: 'center', gap: 16, width: '100%', background: 'transparent', border: 'none', padding: 18, cursor: 'pointer', color: 'var(--d-text)' },
   thumb: { width: 64, height: 64, borderRadius: 12, objectFit: 'cover', flexShrink: 0 },
   goalEyebrow: { fontSize: '0.66rem', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--red)' },

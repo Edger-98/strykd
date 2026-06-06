@@ -32,11 +32,43 @@ export const api = {
 
   completeTask: id => req('PATCH', `/tasks/${id}/complete`),
   addQuickTask: content => req('POST', '/tasks/quick', { content }),
+  updateTask: (id, body) => req('PATCH', `/tasks/${id}`, body),
+  deleteTask: id => req('DELETE', `/tasks/${id}`),
+  reorderTasks: task_ids => req('POST', '/tasks/reorder', { task_ids }),
 
   onboard: body => req('POST', '/onboarding', body),
 
+  // Account / settings
+  getMe: () => req('GET', '/me'),
+  updateMe: body => req('PATCH', '/me', body),
+  changePassword: body => req('POST', '/me/password', body),
+  deleteAccount: () => req('DELETE', '/me'),
+
+  // Goal pause/resume + public visibility
+  updateGoal: (id, body) => req('PATCH', `/goals/${id}`, body),
+
+  // Password reset
+  forgotPassword: email => req('POST', '/auth/forgot-password', { email }),
+  validateResetToken: token => fetch(`${API}/auth/reset-password/${token}`).then(r => r.ok ? r.json() : Promise.reject(r)),
+  resetPassword: (token, new_password) => req('POST', '/auth/reset-password', { token, new_password }),
+
+  // Visitor encouragement (no auth)
+  encourage: (slug, body) => fetch(`${API}/public/${slug}/encourage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then(async r => {
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ detail: r.statusText }))
+      throw Object.assign(new Error(err.detail || 'Request failed'), { status: r.status })
+    }
+    return r.json()
+  }),
+
   // Creates a Stripe Checkout session (7-day trial); returns { checkout_url }
   checkout: () => req('POST', '/billing/checkout'),
+  billingPortal: () => req('POST', '/billing/portal'),
+  cancelSubscription: () => req('POST', '/billing/cancel'),
 
   replanConfirm: body => req('POST', '/replan/confirm', body),
 

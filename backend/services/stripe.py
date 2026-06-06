@@ -39,6 +39,20 @@ async def create_checkout_session(user_id: str, email: str, customer_id: str | N
     return session.url
 
 
+async def create_portal_session(customer_id: str) -> str:
+    """Create a Stripe billing portal session so the user can manage their plan."""
+    session = await stripe.billing_portal.Session.create_async(
+        customer=customer_id,
+        return_url=f"{settings.frontend_url}/dashboard/settings",
+    )
+    return session.url
+
+
+async def cancel_subscription(subscription_id: str):
+    """Cancel at period end (keeps access until the paid period runs out)."""
+    return await stripe.Subscription.modify_async(subscription_id, cancel_at_period_end=True)
+
+
 def construct_event(payload: bytes, sig_header: str):
     """Verify the webhook signature and return the parsed Stripe event.
 

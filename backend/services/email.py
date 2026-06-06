@@ -62,6 +62,40 @@ async def send_welcome_email(to: str, name: str) -> None:
     await _send_async(to, "Welcome to Strykd", _shell(body))
 
 
+async def send_password_reset_email(to: str, name: str, reset_url: str) -> None:
+    first = (name or "there").split(" ")[0]
+    body = (
+        f'<h1 style="font-size:28px;font-weight:800;margin:16px 0;">'
+        f'Reset your password, {first}.</h1>'
+        '<p style="color:#A1A1A1;font-size:16px;line-height:1.6;">'
+        "We received a request to reset your Strykd password. This link is valid "
+        "for one hour. If you didn't ask for this, you can safely ignore this email.</p>"
+        f'<p style="margin:28px 0;"><a href="{reset_url}" '
+        'style="background:#FF2D2D;color:#fff;text-decoration:none;font-weight:700;'
+        'padding:14px 28px;border-radius:50px;display:inline-block;">Reset password</a></p>'
+        '<p style="color:#5C5C5C;font-size:13px;line-height:1.6;">'
+        f'Or paste this link into your browser:<br>{reset_url}</p>'
+    )
+    await _send_async(to, "Reset your Strykd password", _shell(body))
+
+
+async def send_streak_reminder_email(to: str, name: str, streak_days: int) -> None:
+    first = (name or "there").split(" ")[0]
+    streak_line = (
+        f"You're on a {streak_days}-day streak. " if streak_days > 0 else ""
+    )
+    body = (
+        f'<h1 style="font-size:28px;font-weight:800;margin:16px 0;">'
+        f'Your streak is at risk, {first}.</h1>'
+        '<p style="color:#A1A1A1;font-size:16px;line-height:1.6;">'
+        f"{streak_line}Log in and check off at least one task to keep it alive.</p>"
+        f'<p style="margin:28px 0;"><a href="{settings.frontend_url}/dashboard" '
+        'style="background:#FF2D2D;color:#fff;text-decoration:none;font-weight:700;'
+        'padding:14px 28px;border-radius:50px;display:inline-block;">Open Strykd</a></p>'
+    )
+    await _send_async(to, "Your streak is at risk", _shell(body))
+
+
 async def send_trial_ending_email(to: str, name: str) -> None:
     first = (name or "there").split(" ")[0]
     body = (

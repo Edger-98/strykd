@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Flame, ArrowDown, Check, Link2, Share2 } from 'lucide-react'
+import { Flame, ArrowDown, Check, Link2, Share2, Heart, Send, Loader2 } from 'lucide-react'
 import SignalWall from '../components/SignalWall'
+import Avatar from '../components/Avatar'
 import { inView, revealVariants } from '../motion'
 import { api } from '../api'
 
@@ -32,7 +33,7 @@ export default function PublicPage() {
   if (error) return <Splash>{error}</Splash>
   if (!data) return <SkeletonPage />
 
-  const { user, theme, goals = [], signal_wall } = data
+  const { user, theme, goals = [], signal_wall, encouragements = [] } = data
   const t = THEMES[theme?.color_palette] || THEMES['arctic-focus']
   const heroStreak = Math.max(user.streak_days || 0, ...goals.map(g => g.streak_days || 0), 0)
 
@@ -49,14 +50,24 @@ export default function PublicPage() {
           </motion.div>
 
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '40px 0' }}>
-            <motion.p style={{ ...S.eyebrowT, color: t.dim }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}>
-              {user.name}{goals.length ? ` · ${goals.length} active goal${goals.length > 1 ? 's' : ''}` : ''}
-            </motion.p>
+            <motion.div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}>
+              <Avatar src={user.avatar_url} name={user.name} size={56} border={`2px solid ${t.accent}`} />
+              <p style={{ ...S.eyebrowT, color: t.dim, marginBottom: 0 }}>
+                {user.name}{goals.length ? ` · ${goals.length} active goal${goals.length > 1 ? 's' : ''}` : ''}
+              </p>
+            </motion.div>
             {theme?.mission_statement && (
               <motion.h1 className="display" style={S.mission}
                 initial={{ opacity: 0, y: 26 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}>
                 {firstSentence(theme.mission_statement)}
               </motion.h1>
+            )}
+            {user.bio && (
+              <motion.p style={{ ...S.headline, color: t.fg, opacity: 0.85, fontWeight: 400 }}
+                initial={{ opacity: 0 }} animate={{ opacity: 0.85 }} transition={{ delay: 0.4 }}>
+                {user.bio}
+              </motion.p>
             )}
             {theme?.daily_headline && (
               <motion.p style={{ ...S.headline, color: t.accent }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}>
@@ -78,8 +89,11 @@ export default function PublicPage() {
         {/* Signal Wall */}
         <Reveal><section style={{ marginTop: 80 }}>
           <Eyebrow>Signal Wall</Eyebrow>
-          <SignalWall entries={signal_wall} />
+          <SignalWall entries={signal_wall} avatar={user.avatar_url} name={user.name} />
         </section></Reveal>
+
+        {/* Encouragement */}
+        <Reveal><EncourageSection slug={slug} initial={encouragements} accent={t.accent} /></Reveal>
 
         <div style={{ marginTop: 64, textAlign: 'center' }}>
           <button className="pill pill-dark pill-lg" onClick={share}>
@@ -145,6 +159,75 @@ function GoalSection({ goal, t, first }) {
         </div>
       </div>
     </section></Reveal>
+  )
+}
+
+function EncourageSection({ slug, initial, accent }) {
+  const [list, setList] = useState(initial)
+  const [name, setName] = useState('')
+  const [message, setMessage] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [done, setDone] = useState(false)
+
+  const submit = async e => {
+    e.preventDefault()
+    setError(''); setBusy(true)
+    try {
+      const created = await api.encourage(slug, { visitor_name: name.trim() || 'Someone', message: message.trim() })
+      setList(l => [created, ...l].slice(0, 10))
+      setMessage(''); setDone(true)
+    } catch (err) { setError(err.message) }
+    finally { setBusy(false) }
+  }
+
+  return (
+    <section style={{ marginTop: 80 }}>
+      <Eyebrow>Cheer them on</Eyebrow>
+      <div className="card" style={{ padding: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+          <Heart size={20} color={accent} fill={accent} />
+          <h3 className="display" style={{ fontSize: '1.3rem' }}>Leave a word of encouragement</h3>
+        </div>
+        <p style={{ color: 'var(--gray-text)', fontSize: '0.95rem', marginBottom: 20 }}>
+          No account needed. Keep it short and kind.
+        </p>
+
+        {done ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#34C759', fontWeight: 600, marginBottom: 24 }}>
+            <Check size={18} /> Thanks for the support.
+          </div>
+        ) : (
+          <form onSubmit={submit} style={{ marginBottom: list.length ? 28 : 0 }}>
+            <input className="field" placeholder="Your name (optional)" value={name} maxLength={40}
+              onChange={e => setName(e.target.value)} style={{ marginBottom: 10 }} />
+            <textarea className="field" placeholder="Keep showing up. You've got this." value={message} maxLength={140} rows={2}
+              onChange={e => setMessage(e.target.value)} required style={{ resize: 'vertical' }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 10, flexWrap: 'wrap' }}>
+              <span style={{ color: 'var(--gray-light)', fontSize: '0.8rem' }}>{message.length}/140</span>
+              <button type="submit" className="pill pill-dark pill-sm" disabled={busy || !message.trim()}>
+                {busy ? <Loader2 size={15} className="spin-icon" /> : <><Send size={14} /> Send</>}
+              </button>
+            </div>
+            {error && <p style={{ color: 'var(--red)', fontSize: '0.85rem', marginTop: 10 }}>{error}</p>}
+          </form>
+        )}
+
+        {list.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {list.map((e, i) => (
+              <div key={i} style={{ display: 'flex', gap: 12, padding: '14px 16px', background: 'var(--gray-section)', borderRadius: 12 }}>
+                <Avatar name={e.visitor_name} size={34} fontSize={13} />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--ink)' }}>{e.visitor_name}</div>
+                  <p style={{ fontSize: '0.92rem', color: 'var(--ink)', lineHeight: 1.5, marginTop: 2 }}>{e.message}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
   )
 }
 

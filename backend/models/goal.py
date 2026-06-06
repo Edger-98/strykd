@@ -1,7 +1,7 @@
 import uuid
 from datetime import date
 
-from sqlalchemy import Date, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Date, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -18,6 +18,7 @@ class Goal(Base):
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date] = mapped_column(Date, nullable=False)
     status: Mapped[str] = mapped_column(String, default="active")  # active, completed, paused
+    page_public: Mapped[bool] = mapped_column(Boolean, default=True)  # show this goal on the public page
 
     # Rich onboarding context (also fed to the LLM at generation time)
     life_area: Mapped[str | None] = mapped_column(String, nullable=True)  # career/fitness/business/creative/personal-growth

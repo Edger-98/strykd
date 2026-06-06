@@ -94,6 +94,17 @@ img { display: block; max-width: 100%; }
 .field::placeholder { color: var(--gray-light); }
 .field:focus { border-color: var(--black); box-shadow: 0 0 0 4px rgba(0,0,0,0.06); }
 
+/* Dark-theme field (dashboard / settings) */
+.d-field {
+  width: 100%; background: var(--d-bg); color: var(--d-text);
+  border: 1px solid var(--d-line); border-radius: 12px;
+  padding: 0.7rem 0.9rem; font-size: 0.95rem; outline: none; font-family: inherit;
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+.d-field::placeholder { color: var(--d-text-muted); }
+.d-field:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0,113,227,0.18); }
+.d-field:disabled { cursor: not-allowed; }
+
 /* ── Layout helpers ────────────────────────────────────────────────────── */
 .container { width: 100%; max-width: 1140px; margin: 0 auto; padding: 0 24px; }
 .container-narrow { width: 100%; max-width: 760px; margin: 0 auto; padding: 0 24px; }

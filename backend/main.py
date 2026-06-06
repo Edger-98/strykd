@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from database import init_db
+from routes.account import router as account_router
 from routes.ai import router as ai_router
 from routes.auth import router as auth_router
 from routes.billing import router as billing_router
@@ -31,6 +32,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(account_router)
 app.include_router(onboarding_router)
 app.include_router(dashboard_router)
 app.include_router(journey_router)

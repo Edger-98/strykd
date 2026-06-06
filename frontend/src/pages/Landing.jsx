@@ -63,9 +63,15 @@ export default function Landing() {
     } catch (err) { setError(err.message); setBusy(false) }
   }
 
+  if (view === 'forgot') {
+    return <ForgotView email={form.email} setEmail={e => setForm(f => ({ ...f, email: e }))}
+      back={() => { setView('login'); setError('') }} />
+  }
+
   if (view === 'login' || view === 'register') {
     return <AuthView view={view} form={form} upd={upd} submit={submit} error={error} busy={busy}
       toggle={() => { setView(view === 'login' ? 'register' : 'login'); setError('') }}
+      forgot={() => { setView('forgot'); setError('') }}
       back={() => { setView('hero'); setError('') }} />
   }
 
@@ -219,7 +225,7 @@ function Reveal({ children }) {
   )
 }
 
-function AuthView({ view, form, upd, submit, error, busy, toggle, back }) {
+function AuthView({ view, form, upd, submit, error, busy, toggle, forgot, back }) {
   return (
     <motion.div variants={pageVariants} initial="initial" animate="animate"
       style={{ minHeight: '100vh', background: 'var(--gray-section)', display: 'grid', placeItems: 'center', padding: 24 }}>
@@ -241,6 +247,12 @@ function AuthView({ view, form, upd, submit, error, busy, toggle, back }) {
           )}
           <input className="field" type="email" placeholder="Email" value={form.email} onChange={upd('email')} required />
           <input className="field" type="password" placeholder="Password" value={form.password} onChange={upd('password')} required />
+          {view === 'login' && (
+            <button type="button" onClick={forgot}
+              style={{ alignSelf: 'flex-end', background: 'none', border: 'none', color: 'var(--blue)', fontSize: '0.85rem', fontWeight: 600, marginTop: -4 }}>
+              Forgot password?
+            </button>
+          )}
           {error && <p style={{ color: 'var(--red)', fontSize: '0.88rem' }}>{error}</p>}
           <button type="submit" className="pill pill-dark" disabled={busy} style={{ width: '100%', marginTop: 6 }}>
             {busy ? <Loader2 size={18} className="spin-icon" /> : (view === 'login' ? 'Log in' : 'Create account')}
@@ -252,6 +264,52 @@ function AuthView({ view, form, upd, submit, error, busy, toggle, back }) {
             {view === 'login' ? 'Start free' : 'Log in'}
           </button>
         </p>
+      </div>
+    </motion.div>
+  )
+}
+
+function ForgotView({ email, setEmail, back }) {
+  const [busy, setBusy] = useState(false)
+  const [sent, setSent] = useState(false)
+  const [error, setError] = useState('')
+
+  const submit = async e => {
+    e.preventDefault()
+    setBusy(true); setError('')
+    try { await api.forgotPassword(email); setSent(true) }
+    catch (err) { setError(err.message) }
+    finally { setBusy(false) }
+  }
+
+  return (
+    <motion.div variants={pageVariants} initial="initial" animate="animate"
+      style={{ minHeight: '100vh', background: 'var(--gray-section)', display: 'grid', placeItems: 'center', padding: 24 }}>
+      <div className="card" style={S.authCard}>
+        <button onClick={back} style={S.authBack}><ArrowLeft size={16} /> Back to login</button>
+        {sent ? (
+          <>
+            <CheckCircle2 size={44} color="#34C759" style={{ marginBottom: 12 }} />
+            <h1 className="h-lg display" style={{ marginBottom: 8 }}>Check your inbox.</h1>
+            <p className="lead" style={{ fontSize: '1rem' }}>
+              If that email is registered, a password reset link is on its way. It expires in one hour.
+            </p>
+          </>
+        ) : (
+          <>
+            <h1 className="h-lg display" style={{ marginBottom: 8 }}>Reset your password.</h1>
+            <p className="lead" style={{ fontSize: '1rem', marginBottom: 28 }}>
+              Enter your email and we'll send you a link to set a new one.
+            </p>
+            <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <input className="field" type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required />
+              {error && <p style={{ color: 'var(--red)', fontSize: '0.88rem' }}>{error}</p>}
+              <button type="submit" className="pill pill-dark" disabled={busy} style={{ width: '100%', marginTop: 6 }}>
+                {busy ? <Loader2 size={18} className="spin-icon" /> : 'Send reset link'}
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </motion.div>
   )

@@ -72,6 +72,15 @@ export default function Dashboard() {
     load()
   }, [load, nav])
 
+  // Capture the browser timezone once so streak reminders fire at the right local time
+  useEffect(() => {
+    if (!data?.user) return
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+    if (tz && tz !== data.user.timezone) {
+      api.updateMe({ timezone: tz }).catch(() => {})
+    }
+  }, [data?.user])
+
   useEffect(() => {
     if (searchParams.get('checkout') || searchParams.get('welcome')) {
       setSearchParams({}, { replace: true })
@@ -193,7 +202,7 @@ export default function Dashboard() {
             {activeGoal ? (
               <>
                 <h2 className="eyebrow" style={S.sectionTitle}>Today's Tasks</h2>
-                <Checklist tasks={goalTasks} onUpdate={onTaskComplete} />
+                <Checklist tasks={goalTasks} onComplete={onTaskComplete} reload={load} />
                 <ReplanPanel goalId={activeGoal.id} taskDate={taskDate} onConfirmed={load} />
               </>
             ) : (
@@ -216,7 +225,7 @@ export default function Dashboard() {
                 </button>
               </div>
               {quick_tasks.length > 0
-                ? <div style={{ marginTop: 8 }}><Checklist tasks={quick_tasks} onUpdate={onTaskComplete} /></div>
+                ? <div style={{ marginTop: 8 }}><Checklist tasks={quick_tasks} onComplete={onTaskComplete} reload={load} /></div>
                 : <p style={{ color: 'var(--d-text-muted)', fontSize: '0.9rem', marginTop: 14 }}>No quick tasks yet. Jot down anything you want to get done today.</p>}
             </section>
           </div>

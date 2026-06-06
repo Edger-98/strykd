@@ -1,7 +1,8 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, Header, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
@@ -11,6 +12,7 @@ from models.signal_wall import SignalWall
 from models.task import DailyTask
 from models.user import User
 from services.cache import bust_public_page
+from services.email import send_streak_reminder_email
 from services.llm import generate_nightly
 
 router = APIRouter(prefix="/cron", tags=["cron"])
@@ -81,3 +83,61 @@ async def nightly(
             await bust_public_page(user.slug)
 
     return {"goals_processed": processed, "errors": errors}
+
+
+@router.post("/streak-reminders")
+async def streak_reminders(
+    x_cron_secret: str = Header(..., alias="X-Cron-Secret"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Hourly job: email users who haven't checked in by 8pm in their timezone.
+
+    Deduped via last_reminder_sent (one reminder per local day)."""
+    if x_cron_secret != settings.cron_secret:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    users_res = await db.execute(select(User).where(User.email_reminders.is_(True)))
+    users = users_res.scalars().all()
+
+    sent = 0
+    for user in users:
+        try:
+            tz = ZoneInfo(user.timezone or "UTC")
+        except (ZoneInfoNotFoundError, ValueError):
+            tz = ZoneInfo("UTC")
+        now_local = datetime.now(tz)
+        local_today = now_local.date()
+
+        # Only fire after 8pm local, once per local day
+        if now_local.hour < 20:
+            continue
+        if user.last_reminder_sent == local_today:
+            continue
+
+        # Has the user completed any task scheduled for today?
+        done_today = await db.scalar(
+            select(func.count()).select_from(DailyTask).where(
+                DailyTask.user_id == user.id,
+                DailyTask.task_date == local_today,
+                DailyTask.completed.is_(True),
+            )
+        ) or 0
+        if done_today > 0:
+            continue
+
+        # Only nudge users who actually have something to do today
+        has_tasks = await db.scalar(
+            select(func.count()).select_from(DailyTask).where(
+                DailyTask.user_id == user.id,
+                DailyTask.task_date == local_today,
+            )
+        ) or 0
+        if has_tasks == 0:
+            continue
+
+        await send_streak_reminder_email(user.email, user.name, user.streak_days)
+        user.last_reminder_sent = local_today
+        sent += 1
+
+    await db.commit()
+    return {"reminders_sent": sent}

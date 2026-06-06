@@ -1,16 +1,20 @@
 import math
+import uuid
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
+from deps import get_current_user
 from models.goal import Goal
 from models.signal_wall import SignalWall
 from models.task import DailyTask
 from models.theme import Theme
 from models.user import User
+from services.cache import bust_public_page
 from services.llm import generate_projected_outcome
 from trial import require_active_access
 
@@ -95,6 +99,7 @@ async def _goal_journey(goal: Goal, db: AsyncSession, today: date) -> dict:
     return {
         "id": str(goal.id), "description": goal.description, "life_area": goal.life_area,
         "duration_days": total_days, "start_date": _d(goal.start_date), "end_date": _d(goal.end_date),
+        "status": goal.status, "page_public": goal.page_public,
         "streak_days": goal.streak_days, "projected_outcome": goal.projected_outcome,
         "progress": {"day": min(max(today_day_number, 1), total_days), "total_days": total_days,
                      "pct": pct, "tasks_completed": total_completed, "tasks_total": total_tasks,
@@ -109,7 +114,9 @@ async def journey(
     current_user: User = Depends(require_active_access),
 ):
     goals_res = await db.execute(
-        select(Goal).where(Goal.user_id == current_user.id, Goal.status == "active").order_by(Goal.start_date)
+        select(Goal).where(
+            Goal.user_id == current_user.id, Goal.status.in_(["active", "paused"])
+        ).order_by(Goal.start_date)
     )
     goals = goals_res.scalars().all()
     if not goals:
@@ -125,3 +132,39 @@ async def journey(
         "theme": {"mission_statement": theme.mission_statement} if theme else None,
         "goals": goal_journeys,
     }
+
+
+class GoalUpdate(BaseModel):
+    status: str | None = None
+    page_public: bool | None = None
+
+
+@router.patch("/goals/{goal_id}")
+async def update_goal(
+    goal_id: str,
+    body: GoalUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Pause/resume a goal or toggle its public visibility."""
+    try:
+        gid = uuid.UUID(goal_id)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid goal ID")
+    goal = await db.scalar(
+        select(Goal).where(Goal.id == gid, Goal.user_id == current_user.id)
+    )
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+
+    if body.status is not None:
+        if body.status not in ("active", "paused"):
+            raise HTTPException(status_code=422, detail="Status must be active or paused")
+        goal.status = body.status
+    if body.page_public is not None:
+        goal.page_public = body.page_public
+
+    await db.commit()
+    await db.refresh(goal)
+    await bust_public_page(current_user.slug)
+    return {"id": str(goal.id), "status": goal.status, "page_public": goal.page_public}

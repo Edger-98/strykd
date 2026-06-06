@@ -41,6 +41,40 @@ async def create_checkout(
     return {"checkout_url": url}
 
 
+@router.post("/portal")
+async def billing_portal(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Stripe billing portal URL so the user can manage/update their subscription."""
+    billing = await db.scalar(select(Billing).where(Billing.user_id == current_user.id))
+    if not billing or not billing.stripe_customer_id:
+        raise HTTPException(status_code=400, detail="No subscription to manage yet")
+    try:
+        url = await stripe_service.create_portal_session(billing.stripe_customer_id)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Stripe portal failed: {exc}")
+    return {"portal_url": url}
+
+
+@router.post("/cancel")
+async def cancel(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Cancel the subscription at period end."""
+    billing = await db.scalar(select(Billing).where(Billing.user_id == current_user.id))
+    if not billing or not billing.stripe_subscription_id:
+        raise HTTPException(status_code=400, detail="No active subscription")
+    try:
+        await stripe_service.cancel_subscription(billing.stripe_subscription_id)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Stripe cancel failed: {exc}")
+    billing.status = "cancelled"
+    await db.commit()
+    return {"message": "Subscription will end at the close of the current period"}
+
+
 async def _upsert_billing(db: AsyncSession, user_id, **fields) -> Billing:
     billing = await db.scalar(select(Billing).where(Billing.user_id == user_id))
     if billing is None:

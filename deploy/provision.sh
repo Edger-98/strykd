@@ -92,6 +92,9 @@ server {
     root ${APP_DIR}/frontend/dist;
     index index.html;
 
+    # Allow base64 avatar uploads (a 5MB image is ~6.7MB once base64-encoded)
+    client_max_body_size 8M;
+
     # Frontend API calls — mirrors the Vite dev proxy: strip the /api prefix.
     # The trailing slash on proxy_pass rewrites /api/public/x -> /public/x.
     location /api/ {
