@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, Reorder, useDragControls } from 'framer-motion'
-import { Check, Trash2, GripVertical } from 'lucide-react'
+import { Check, Trash2, GripVertical, Camera } from 'lucide-react'
 import { api } from '../api'
+import ProofModal from './ProofModal'
 
 const VOICE = {
   direct: { label: 'DIRECT', color: '#0071E3' },
@@ -23,6 +24,7 @@ export default function Checklist({ tasks = [], onComplete, reload }) {
   const [loading, setLoading] = useState({})
   const [editing, setEditing] = useState(null)
   const [draft, setDraft] = useState('')
+  const [proofTask, setProofTask] = useState(null)
 
   // Keep local order in sync when the parent supplies a new task list
   useEffect(() => { setItems(tasks) }, [tasks])
@@ -75,19 +77,24 @@ export default function Checklist({ tasks = [], onComplete, reload }) {
   }
 
   return (
-    <Reorder.Group axis="y" values={items} onReorder={persistOrder} style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-      {items.map((task, i) => (
-        <Row key={task.id} task={task} last={i === items.length - 1}
-          busy={!!loading[task.id]} editing={editing === task.id}
-          draft={draft} setDraft={setDraft}
-          onToggle={() => toggle(task)} onBeginEdit={() => beginEdit(task)}
-          onSaveEdit={() => saveEdit(task)} onRemove={() => remove(task)} />
-      ))}
-    </Reorder.Group>
+    <>
+      <Reorder.Group axis="y" values={items} onReorder={persistOrder} style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        {items.map((task, i) => (
+          <Row key={task.id} task={task} last={i === items.length - 1}
+            busy={!!loading[task.id]} editing={editing === task.id}
+            draft={draft} setDraft={setDraft}
+            onToggle={() => toggle(task)} onBeginEdit={() => beginEdit(task)}
+            onSaveEdit={() => saveEdit(task)} onRemove={() => remove(task)}
+            onProof={() => setProofTask(task)} />
+        ))}
+      </Reorder.Group>
+      <ProofModal open={!!proofTask} task={proofTask}
+        onClose={() => setProofTask(null)} onResult={() => reload && reload()} />
+    </>
   )
 }
 
-function Row({ task, last, busy, editing, draft, setDraft, onToggle, onBeginEdit, onSaveEdit, onRemove }) {
+function Row({ task, last, busy, editing, draft, setDraft, onToggle, onBeginEdit, onSaveEdit, onRemove, onProof }) {
   const controls = useDragControls()
   const [hover, setHover] = useState(false)
   const inputRef = useRef(null)
@@ -134,6 +141,16 @@ function Row({ task, last, busy, editing, draft, setDraft, onToggle, onBeginEdit
           </span>
         </span>
       )}
+
+      {/* proof upload */}
+      <button onClick={onProof} aria-label="Submit proof"
+        title={task.proof_url ? 'Proof submitted' : 'Submit visual proof'}
+        style={{ flexShrink: 0, background: 'transparent', border: 'none',
+          color: task.proof_url ? '#34C759' : 'var(--d-text-muted)',
+          padding: 4, display: 'grid', placeItems: 'center', cursor: 'pointer',
+          opacity: task.proof_url ? 1 : (hover ? 0.8 : 0.35), transition: 'opacity 0.15s' }}>
+        <Camera size={16} />
+      </button>
 
       {/* delete (on hover) */}
       <button onClick={onRemove} aria-label="Delete task"

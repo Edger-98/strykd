@@ -33,9 +33,11 @@ def _task_dict(t: DailyTask, detailed: bool = False) -> dict:
         "task_date": _d(t.task_date),
         "sort_order": t.sort_order,
     }
+    out["proof_url"] = t.proof_url
     if detailed:
         out["goal_id"] = str(t.goal_id) if t.goal_id else None
         out["completed_at"] = t.completed_at.isoformat() if t.completed_at else None
+        out["proof_review"] = t.proof_review
     return out
 
 
@@ -57,6 +59,26 @@ async def _goal_section(goal: Goal, db: AsyncSession, today: date, detailed: boo
     day = min(max(elapsed + 1, 1), goal.duration_days)
     pct = round(done / total * 100) if total else 0
 
+    # Proof gallery: distinct uploads for this goal, newest first
+    proof_res = await db.execute(
+        select(DailyTask).where(
+            DailyTask.goal_id == goal.id, DailyTask.proof_url.isnot(None)
+        ).order_by(DailyTask.task_date.desc(), DailyTask.id)
+    )
+    seen: set[str] = set()
+    proofs: list[dict] = []
+    for t in proof_res.scalars().all():
+        if t.proof_url in seen:
+            continue
+        seen.add(t.proof_url)
+        review = t.proof_review or {}
+        proofs.append({
+            "proof_url": t.proof_url,
+            "date": _d(t.task_date),
+            "is_video": t.proof_url.lower().endswith(".mp4"),
+            "verified": bool(review.get("verified")) if review else None,
+        })
+
     return {
         "id": str(goal.id),
         "description": goal.description,
@@ -71,6 +93,7 @@ async def _goal_section(goal: Goal, db: AsyncSession, today: date, detailed: boo
         "progress": {"day": day, "total_days": goal.duration_days, "pct": pct,
                      "tasks_completed": done, "tasks_total": total},
         "today_tasks": [_task_dict(t, detailed) for t in today_tasks],
+        "proofs": proofs,
     }
 
 

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   Menu, X, MapPin, Check, Sparkles, TrendingUp, Calendar, ChevronDown, Plus, Flame,
-  Pause, Play, Eye, EyeOff, Loader2,
+  Pause, Play, Eye, EyeOff, Loader2, Film,
 } from 'lucide-react'
 import DashSidebar, { SIDEBAR_W } from '../components/DashSidebar'
 import AddGoalModal from '../components/AddGoalModal'
@@ -189,10 +189,15 @@ function ChapterMap({ weeks, onPickDay }) {
               {w.days.map(d => (
                 <button key={d.day_number} onClick={() => onPickDay(d)} title={`Day ${d.day_number}`}
                   className={d.is_today ? 'pulse-dot' : ''} style={{ ...S.dayCircle,
+                    overflow: 'hidden',
                     background: d.completed ? 'var(--red)' : 'transparent',
-                    borderColor: d.is_today ? 'var(--red)' : d.completed ? 'var(--red)' : 'var(--d-line)' }}>
-                  {d.completed && <Check size={12} color="#fff" strokeWidth={3} />}
-                  {!d.completed && d.is_today && <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--red)' }} />}
+                    borderColor: d.proof_url ? '#34C759' : d.is_today ? 'var(--red)' : d.completed ? 'var(--red)' : 'var(--d-line)' }}>
+                  {d.proof_url && !d.is_video && (
+                    <img src={d.proof_url} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                  )}
+                  {d.proof_url && d.is_video && <Film size={13} color="#34C759" />}
+                  {!d.proof_url && d.completed && <Check size={12} color="#fff" strokeWidth={3} />}
+                  {!d.proof_url && !d.completed && d.is_today && <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--red)' }} />}
                   <span style={S.dayNum}>{d.day_number}</span>
                 </button>
               ))}
@@ -224,6 +229,16 @@ function DayDrawer({ day, onClose }) {
               </div>
               <button onClick={onClose} style={S.icon} aria-label="Close"><X size={18} /></button>
             </div>
+            {day.proof_url && (
+              <>
+                <p style={S.drawerLabel}>Daily proof</p>
+                <a href={day.proof_url} target="_blank" rel="noreferrer" style={{ display: 'block' }}>
+                  {day.is_video
+                    ? <video src={day.proof_url} style={S.drawerProof} controls />
+                    : <img src={day.proof_url} alt="daily proof" style={S.drawerProof} />}
+                </a>
+              </>
+            )}
             <p style={S.drawerLabel}>{day.is_future ? "What's planned" : 'Your tasks'}</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {day.tasks.length ? day.tasks.map((t, i) => (
@@ -289,4 +304,5 @@ const S = {
   drawerLabel: { fontSize: '0.72rem', letterSpacing: '0.1em', fontWeight: 700, color: 'var(--d-text-muted)', textTransform: 'uppercase', margin: '24px 0 12px' },
   drawerTask: { display: 'flex', gap: 12, alignItems: 'flex-start', padding: '12px 14px', background: 'var(--d-card)', borderRadius: 12 },
   drawerSignal: { padding: '16px 18px', background: 'var(--d-card)', borderRadius: 12, borderLeft: '3px solid var(--red)' },
+  drawerProof: { width: '100%', maxHeight: 260, objectFit: 'cover', borderRadius: 12, border: '1px solid var(--d-line)', display: 'block' },
 }

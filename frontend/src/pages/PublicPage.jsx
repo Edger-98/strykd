@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Flame, ArrowDown, Check, Link2, Share2, Heart, Send, Loader2 } from 'lucide-react'
+import { Flame, ArrowDown, Check, Link2, Share2, Heart, Send, Loader2, Play } from 'lucide-react'
 import SignalWall from '../components/SignalWall'
 import Avatar from '../components/Avatar'
 import { inView, revealVariants } from '../motion'
@@ -157,6 +157,26 @@ function GoalSection({ goal, t, first }) {
             </div>
           )) : <p style={{ color: 'var(--gray-light)' }}>No tasks scheduled today.</p>}
         </div>
+
+        {/* daily proof gallery (recruiter portfolio view) */}
+        {goal.proofs?.length > 0 && (
+          <div style={{ marginTop: 28, paddingTop: 24, borderTop: '1px solid var(--gray-line)' }}>
+            <p style={{ fontSize: '0.72rem', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gray-light)', marginBottom: 14 }}>
+              DAILY PROOF
+            </p>
+            <div style={S.proofGrid}>
+              {goal.proofs.map((pf, i) => (
+                <a key={i} href={pf.proof_url} target="_blank" rel="noreferrer" style={S.proofCell} title={pf.date}>
+                  {pf.is_video
+                    ? <video src={pf.proof_url} style={S.proofMedia} muted preload="metadata" />
+                    : <img src={pf.proof_url} alt={`proof from ${pf.date}`} style={S.proofMedia} loading="lazy" />}
+                  {pf.is_video && <span style={S.playBadge}><Play size={16} color="#fff" fill="#fff" /></span>}
+                  {pf.verified && <span style={S.verifiedBadge}><Check size={11} color="#fff" strokeWidth={3} /></span>}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </section></Reveal>
   )
@@ -286,4 +306,11 @@ const S = {
   headline: { fontSize: 'clamp(1.05rem, 2vw, 1.4rem)', fontWeight: 600, marginTop: 24, maxWidth: 560 },
   scroll: { display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.74rem', letterSpacing: '0.15em', fontWeight: 600, paddingBottom: 10 },
   poweredBadge: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 50, background: 'var(--gray-section)', color: 'var(--gray-text)', fontSize: '0.82rem' },
+  proofGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10 },
+  proofCell: { position: 'relative', display: 'block', aspectRatio: '1', borderRadius: 12, overflow: 'hidden',
+    background: 'var(--gray-section)', border: '1px solid var(--gray-line)' },
+  proofMedia: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
+  playBadge: { position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: 'rgba(0,0,0,0.25)' },
+  verifiedBadge: { position: 'absolute', top: 6, right: 6, width: 20, height: 20, borderRadius: '50%',
+    background: '#34C759', display: 'grid', placeItems: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.3)' },
 }

@@ -1,3 +1,4 @@
+import base64
 import json
 
 import anthropic
@@ -156,6 +157,53 @@ async def generate_plan(
         raw = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
 
     return _strip_dashes_deep(json.loads(raw))
+
+
+async def verify_proof(task_description: str, image_bytes: bytes, media_type: str) -> dict:
+    """Use Claude vision to judge whether an image is evidence of a completed task.
+
+    Returns {"verified": bool, "confidence": "high|medium|low", "comment": str}.
+    Only images are supported by the vision API; callers handle video separately.
+    """
+    client = _get_client()
+    b64 = base64.standard_b64encode(image_bytes).decode("ascii")
+    prompt = (
+        f"The user's task for today was: {task_description}. "
+        "Review this image/video screenshot and determine if it provides evidence of "
+        "completing this task. Respond with JSON: "
+        '{verified: true/false, confidence: high/medium/low, comment: one sentence}. '
+        "Return only the JSON object, no preamble. Never use em dashes; use commas or periods."
+    )
+    response = await client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=300,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {"type": "base64", "media_type": media_type, "data": b64},
+                    },
+                    {"type": "text", "text": prompt},
+                ],
+            }
+        ],
+    )
+    raw = next(b.text for b in response.content if b.type == "text").strip()
+    if raw.startswith("```"):
+        lines = raw.split("\n")
+        raw = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+    data = json.loads(raw)
+    # Normalize the shape so downstream code can rely on it
+    confidence = str(data.get("confidence", "low")).lower()
+    if confidence not in ("high", "medium", "low"):
+        confidence = "low"
+    return {
+        "verified": bool(data.get("verified", False)),
+        "confidence": confidence,
+        "comment": _strip_em_dashes(str(data.get("comment", ""))),
+    }
 
 
 def _strip_em_dashes(text: str) -> str:

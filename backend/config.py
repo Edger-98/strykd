@@ -19,5 +19,11 @@ class Settings(BaseSettings):
     base_domain: str = "strykdapp.com"
     cron_secret: str = "changeme-cron-secret"
 
+    # AWS S3 — daily visual proof uploads
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
+    aws_s3_bucket: str = ""
+    aws_region: str = "us-east-1"
+
 
 settings = Settings()

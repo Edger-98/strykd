@@ -22,6 +22,22 @@ async function req(method, path, body) {
   return res.json()
 }
 
+// Multipart upload: let the browser set the multipart boundary; only attach auth.
+async function upload(path, file) {
+  const fd = new FormData()
+  fd.append('file', file)
+  const res = await fetch(`${API}${path}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken()}` },
+    body: fd,
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    throw Object.assign(new Error(err.detail || 'Upload failed'), { status: res.status })
+  }
+  return res.json()
+}
+
 export const api = {
   register: body => req('POST', '/auth/register', body),
   login: body => req('POST', '/auth/login', body),
@@ -35,6 +51,10 @@ export const api = {
   updateTask: (id, body) => req('PATCH', `/tasks/${id}`, body),
   deleteTask: id => req('DELETE', `/tasks/${id}`),
   reorderTasks: task_ids => req('POST', '/tasks/reorder', { task_ids }),
+
+  // Visual proof uploads
+  uploadTaskProof: (taskId, file) => upload(`/tasks/${taskId}/proof`, file),
+  uploadDailyProof: (goalId, file) => upload(`/goals/${goalId}/daily-proof`, file),
 
   onboard: body => req('POST', '/onboarding', body),
 

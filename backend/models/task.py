@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime
 
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
@@ -22,6 +22,10 @@ class DailyTask(Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0)  # manual ordering within a day
     completed: Mapped[bool] = mapped_column(Boolean, default=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Daily visual proof (uploaded to S3) and the AI vision review of it
+    proof_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    proof_review: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     __table_args__ = (
         Index("ix_daily_tasks_goal_date", "goal_id", "task_date"),
