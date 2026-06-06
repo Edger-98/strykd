@@ -51,7 +51,18 @@ async def replan(
         raise HTTPException(status_code=404, detail="No active goals found")
 
     current_tasks: list[str] = []
+    context_parts: list[str] = []
     for goal in goals:
+        elapsed = (today - goal.start_date).days
+        day_number = min(max(elapsed + 1, 1), goal.duration_days)
+        context_parts.append(
+            f"Goal: {goal.description} (life area: {goal.life_area or 'unspecified'}, "
+            f"day {day_number} of {goal.duration_days}). "
+            f"Why now: {goal.why_now or 'unspecified'}. "
+            f"Past blockers: {goal.past_blockers or 'unspecified'}. "
+            f"Focused hours/day: {goal.hours_per_day if goal.hours_per_day is not None else 'unspecified'}, "
+            f"{goal.daily_rhythm or 'peak'}-oriented."
+        )
         res = await db.execute(
             select(DailyTask)
             .where(DailyTask.goal_id == goal.id, DailyTask.task_date >= today)
@@ -61,9 +72,11 @@ async def replan(
         for t in res.scalars().all():
             current_tasks.append(f"[{t.task_date}] {t.content}")
 
+    context = "\n".join(context_parts)
+
     async def event_stream():
         try:
-            async for token in stream_replan(current_tasks, body.change_request):
+            async for token in stream_replan(current_tasks, body.change_request, context):
                 if token:
                     # JSON-encode so any special chars are safe in SSE
                     yield f"data: {json.dumps(token)}\n\n"

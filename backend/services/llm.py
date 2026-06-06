@@ -14,57 +14,80 @@ def _get_client() -> anthropic.AsyncAnthropic:
     return _client
 
 
+# ── Shared coaching philosophy — reused across plan, nightly, and replan prompts ──
+_COACH_IDENTITY = """\
+You are a world-class accountability coach, part drill sergeant, part therapist, part strategist. \
+You know that generic advice kills momentum. Every task you write must be:
+- specific enough that the user knows exactly what to do with zero ambiguity,
+- connected to a reason that makes skipping it feel like a real loss,
+- calibrated to the user's available hours and their stated blockers,
+- progressive: day 1 tasks build the foundation that later tasks rely on,
+- written in the voice style attached to it (direct = commanding and no-nonsense, motivational = \
+charged and belief-building, reflective = introspective and awareness-focused)."""
+
+_TASK_RULES = """\
+TASK GENERATION RULES:
+- Never write a task that could apply to anyone. Every task must reference the user's specific goal, \
+their blockers, their life area, or their why.
+- Every task must have a clear completion condition. The user must know exactly when it is done.
+- Tasks must build on each other across days. On day 3 and later, reference what was built or done before.
+- Day 1 to 3: Foundation tasks. Establish baselines, create systems, remove friction.
+- Day 4 to 10: Momentum tasks. Build the core habit, increase intensity.
+- Day 11 to 20: Depth tasks. Go deeper, address the exact blockers they named, push the comfort zone.
+- Day 21 and beyond: Mastery tasks. Consolidate, reflect, prepare for life after the plan.
+- Each task must include a one-sentence "why this today" rationale as part of the task text.
+- Never use generic filler phrases like "this is important" or "don't forget to".
+- Never use em dashes or en dashes anywhere. Use periods or commas only."""
+
+
 # Stable system prompt — cached at the breakpoint so per-user prompts share it.
-_SYSTEM_PROMPT = """\
-You are a world-class productivity coach and creative director who builds deeply personalized \
-accountability systems. You generate precise daily plans and distinctive visual identities.
+_SYSTEM_PROMPT = f"""\
+{_COACH_IDENTITY}
 
-You will be given rich context about a person: their life area, the goal itself, why this \
-matters to them *right now*, what has blocked them in the past, how many focused hours they \
-have each day, and whether they operate best in the morning or evening. Use ALL of it:
+You are also a creative director: alongside the plan you design one distinctive visual identity \
+that matches the life area and the energy of the user's reason for starting. Use ALL of the \
+context you are given: life area, the goal itself, why this matters right now, what has blocked \
+them before, focused hours per day, and morning vs evening rhythm.
+- Tailor task load to their available hours and front-load the heaviest work into their peak window. \
+Never schedule more than their stated hours can hold.
+- Let their "why now" set the emotional register of the mission statement, headlines, and signal wall. \
+This is the fuel. Make them feel it.
 
-- Tailor task TIMING and load to their available hours and daily rhythm (front-load the hard \
-  work into their peak window; never schedule more than their stated hours can hold).
-- Directly counter the SPECIFIC blockers they named — design tasks and a voice that defuse \
-  those exact failure modes, don't just give generic advice.
-- Let their "why now" set the emotional register of the mission statement, headlines, and \
-  signal wall — this is the fuel; make them feel it.
-- Match the visual theme to the life area and the energy of their reason for starting.
+{_TASK_RULES}
 
 Return ONLY a single valid JSON object. No markdown fences, no code blocks, no preamble, \
-no explanation. Your response must start with { and end with }.
+no explanation. Your response must start with {{ and end with }}.
 
 Required JSON schema:
-{
-  "theme": {
+{{
+  "theme": {{
     "color_palette": "<exactly one of: dark-ember | arctic-focus | soft-earth>",
     "typography_variant": "<exactly one of: bold-condensed | editorial | minimal>",
     "layout_variant": "<exactly one of: cinematic | dashboard | journal>"
-  },
+  }},
   "mission_statement": "<2-3 sentence personal mission statement>",
   "chapter_titles": ["<cinematic week title>", ...],
   "day_1_signal_wall_entry": "<3-sentence narrative personal dispatch for Day 1>",
   "daily_tasks": [
-    {
+    {{
       "day": 1,
       "tasks": [
-        {"content": "<specific actionable task>", "voice_style": "<direct|motivational|reflective>"},
-        {"content": "...", "voice_style": "..."},
-        {"content": "...", "voice_style": "..."},
-        {"content": "...", "voice_style": "..."},
-        {"content": "...", "voice_style": "..."}
+        {{"content": "<specific task for THIS goal, with its one-sentence 'why this today' rationale in the same string>", "voice_style": "<direct|motivational|reflective>"}},
+        {{"content": "...", "voice_style": "..."}},
+        {{"content": "...", "voice_style": "..."}},
+        {{"content": "...", "voice_style": "..."}},
+        {{"content": "...", "voice_style": "..."}}
       ]
-    }
+    }}
   ]
-}
+}}
 
-Rules:
+Schema rules:
 - daily_tasks must have exactly one entry per day from day 1 through the final day
-- Each day must have exactly 5 tasks
+- Each day must have exactly 5 tasks, each following the TASK GENERATION RULES above
 - chapter_titles must have one entry per week (ceil(duration_days / 7))
 - voice_style must be one of: direct, motivational, reflective
 - color_palette, typography_variant, layout_variant must be chosen based on the aesthetic preference
-- Never use em dashes or en dashes anywhere in any text. Use periods or commas only.
 """
 
 
@@ -94,7 +117,7 @@ async def generate_plan(
 
     response = await client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=16000,
+        max_tokens=32000,
         system=[
             {
                 "type": "text",
@@ -111,10 +134,14 @@ async def generate_plan(
                     + "\n".join(context_lines)
                     + "\n\n=== REQUIREMENTS ===\n"
                     f"- daily_tasks: exactly {duration_days} entries (day 1 through day {duration_days}), 5 tasks each\n"
-                    f"- Respect their {hours_per_day if hours_per_day is not None else 'available'} hours/day — do not over-schedule\n"
-                    f"- Schedule the heaviest tasks in their {daily_rhythm or 'peak'} window\n"
-                    f"- Tasks must actively counter the blockers they named\n"
-                    f"- chapter_titles: exactly {num_weeks} entries\n"
+                    f"- Every task references THIS goal, their blockers, their life area, or their why. Nothing generic.\n"
+                    f"- Every task states a clear completion condition and ends with a one-sentence 'why this today'.\n"
+                    f"- Honor the day phases: foundation (1-3), momentum (4-10), depth (11-20), mastery (21+).\n"
+                    f"- From day 3 on, build explicitly on what earlier days established.\n"
+                    f"- Respect their {hours_per_day if hours_per_day is not None else 'available'} hours/day. Do not over-schedule.\n"
+                    f"- Schedule the heaviest tasks in their {daily_rhythm or 'peak'} window.\n"
+                    f"- Tasks in the depth phase must directly attack the blockers they named.\n"
+                    f"- chapter_titles: exactly {num_weeks} entries.\n"
                     f"- Return only the JSON object, nothing else."
                 ),
             }
@@ -194,47 +221,117 @@ async def generate_projected_outcome(
     return _strip_em_dashes(raw)
 
 
-async def stream_replan(current_tasks: list[str], change_request: str):
+_REPLAN_SYSTEM_PROMPT = f"""\
+{_COACH_IDENTITY}
+
+The user's plan has hit a real-world change and you are rewriting the affected tasks. The \
+rewritten tasks must hold the exact same standard as the original plan: specific, completion-bound, \
+progressive, and tied to this person's goal and blockers. A replan is never an excuse for vaguer \
+or easier tasks. Honor the change request, then keep the arc intact.
+
+{_TASK_RULES}
+
+Stream each rewritten task on its own line as you write it. Keep its date prefix if one was given. \
+Each task still ends with a one-sentence 'why this today'. Output only the tasks, no preamble or commentary."""
+
+
+async def stream_replan(current_tasks: list[str], change_request: str, context: str | None = None):
     client = _get_client()
+    user_content = ""
+    if context:
+        user_content += f"=== WHO THIS IS FOR ===\n{context}\n\n"
+    user_content += (
+        f"=== CURRENT UPCOMING TASKS ===\n{chr(10).join(current_tasks)}\n\n"
+        f"=== WHAT CHANGED ===\n{change_request}\n\n"
+        "Rewrite the affected tasks to absorb this change while keeping every task specific, "
+        "completion-bound, and tied to the goal. Stream each task as you write it."
+    )
     async with client.messages.stream(
         model="claude-sonnet-4-6",
         max_tokens=4096,
-        system=(
-            "You are the user's personal AI accountability coach with full context of "
-            "their goals and progress. Stream each revised task as you write it. Never use em dashes or en dashes; use periods or commas only."
-        ),
-        messages=[
-            {
-                "role": "user",
-                "content": (
-                    f"Current tasks:\n{chr(10).join(current_tasks)}\n\n"
-                    f"Change request: {change_request}\n\n"
-                    "Rewrite the affected tasks. Stream each task as you write it."
-                ),
-            }
-        ],
+        system=_REPLAN_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user_content}],
     ) as stream:
         async for text in stream.text_stream:
             yield text.replace('—', ', ').replace('–', ', ')
 
 
-async def generate_nightly(goals: str, completed_tasks: list[str]) -> dict:
+_NIGHTLY_SYSTEM_PROMPT = f"""\
+{_COACH_IDENTITY}
+
+You generate the NEXT day's tasks for a person who is already mid-plan. The new tasks must be \
+just as specific and personal as a brand-new plan, and they must continue the arc: build on what \
+was completed, and escalate appropriately for where they are in the plan.
+
+{_TASK_RULES}
+
+Return ONLY a single valid JSON object with this schema:
+{{
+  "tasks": ["<specific task for THIS goal with its one-sentence 'why this today' rationale>", "...", "...", "...", "..."],
+  "daily_headline": "<1 cinematic sentence that fits where they are in the plan>",
+  "signal_wall_entry": "<3-sentence narrative dispatch reflecting yesterday's effort and today's focus>"
+}}
+- "tasks" must contain exactly 5 strings.
+No markdown fences, no preamble. Start with {{ and end with }}."""
+
+
+async def generate_nightly(
+    goal_description: str,
+    completed_tasks: list[str],
+    day_number: int,
+    total_days: int,
+    life_area: str | None = None,
+    why_now: str | None = None,
+    past_blockers: str | None = None,
+    hours_per_day: int | None = None,
+    daily_rhythm: str | None = None,
+) -> dict:
     client = _get_client()
+
+    if day_number <= 3:
+        phase = "foundation (establish baselines, create systems, remove friction)"
+    elif day_number <= 10:
+        phase = "momentum (build the core habit, increase intensity)"
+    elif day_number <= 20:
+        phase = "depth (go deeper, attack the named blockers, push the comfort zone)"
+    else:
+        phase = "mastery (consolidate, reflect, prepare for life after the plan)"
+
+    context_lines = [
+        f"Life area: {life_area or 'unspecified'}",
+        f"The goal: {goal_description}",
+        f"Why now (their urgency): {why_now or 'unspecified'}",
+        f"What has blocked them before: {past_blockers or 'unspecified'}",
+        f"Focused hours available per day: {hours_per_day if hours_per_day is not None else 'unspecified'}",
+        f"Daily rhythm: {daily_rhythm or 'unspecified'} person",
+        f"Generating tasks for day {day_number} of {total_days}. Phase: {phase}.",
+        f"What they completed yesterday: {', '.join(completed_tasks) if completed_tasks else 'nothing'}",
+    ]
+
     response = await client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=2048,
-        system="You are generating daily content for an accountability platform. Return ONLY valid JSON. Never use em dashes or en dashes in any text; use periods or commas only.",
+        max_tokens=3000,
+        system=[
+            {
+                "type": "text",
+                "text": _NIGHTLY_SYSTEM_PROMPT,
+                "cache_control": {"type": "ephemeral"},
+            }
+        ],
         messages=[
             {
                 "role": "user",
                 "content": (
-                    f"User goals: {goals}\n"
-                    f"Today's completed tasks: {', '.join(completed_tasks) if completed_tasks else 'none'}\n\n"
-                    "Generate JSON with:\n"
-                    '- "tasks": array of 5 task strings for tomorrow\n'
-                    '- "daily_headline": 1 cinematic sentence\n'
-                    '- "signal_wall_entry": 3-sentence narrative\n\n'
-                    "Return only the JSON object."
+                    "Generate tomorrow's content for this person, continuing their plan.\n\n"
+                    "=== CONTEXT ===\n"
+                    + "\n".join(context_lines)
+                    + "\n\n=== REQUIREMENTS ===\n"
+                    f"- Exactly 5 tasks, each specific to THIS goal with a clear completion condition.\n"
+                    f"- Build on what they completed yesterday. Do not repeat finished work.\n"
+                    f"- Match the day {day_number} phase above and escalate from yesterday.\n"
+                    f"- Each task ends with a one-sentence 'why this today'.\n"
+                    f"- Respect their {hours_per_day if hours_per_day is not None else 'available'} hours/day.\n"
+                    f"- Return only the JSON object."
                 ),
             }
         ],

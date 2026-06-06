@@ -54,8 +54,21 @@ async def nightly(
         today_tasks = today_res.scalars().all()
         completed = [t.content for t in today_tasks if t.completed]
 
+        # Day number of the day we are generating (tomorrow), within this goal's plan
+        day_number = (tomorrow - goal.start_date).days + 1
+
         try:
-            content = await generate_nightly(goal.description, completed)
+            content = await generate_nightly(
+                goal_description=goal.description,
+                completed_tasks=completed,
+                day_number=day_number,
+                total_days=goal.duration_days,
+                life_area=goal.life_area,
+                why_now=goal.why_now,
+                past_blockers=goal.past_blockers,
+                hours_per_day=goal.hours_per_day,
+                daily_rhythm=goal.daily_rhythm,
+            )
         except Exception:
             errors += 1
             continue
