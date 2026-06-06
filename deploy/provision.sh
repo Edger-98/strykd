@@ -76,6 +76,24 @@ sudo systemctl daemon-reload
 sudo systemctl enable strykd-api
 sudo systemctl restart strykd-api
 
+# ── 5b. Scheduled jobs (cron.d) ─────────────────────────────────────────────
+echo "==> Installing scheduled jobs"
+CRON_SECRET_VALUE=$(grep -E '^CRON_SECRET=' "${APP_DIR}/backend/.env" | cut -d= -f2- | tr -d '\r"')
+if [ -n "${CRON_SECRET_VALUE}" ]; then
+  sudo tee /etc/cron.d/strykd > /dev/null <<CRON
+# Strykd scheduled jobs (run against the local FastAPI service)
+SHELL=/bin/bash
+# Nightly plan generation: 02:10 UTC daily
+10 2 * * * root curl -fsS -X POST http://127.0.0.1:8000/cron/nightly -H "X-Cron-Secret: ${CRON_SECRET_VALUE}" >/dev/null 2>&1
+# Streak-risk reminders: hourly at :05 (endpoint self-checks 8pm-in-user-timezone + dedupe)
+5 * * * * root curl -fsS -X POST http://127.0.0.1:8000/cron/streak-reminders -H "X-Cron-Secret: ${CRON_SECRET_VALUE}" >/dev/null 2>&1
+CRON
+  sudo chmod 0644 /etc/cron.d/strykd
+  sudo systemctl restart cron
+else
+  echo "  WARNING: CRON_SECRET not found in .env — skipping cron.d install"
+fi
+
 # ── 6. Frontend build ───────────────────────────────────────────────────────
 echo "==> Building frontend"
 cd "${APP_DIR}/frontend"
