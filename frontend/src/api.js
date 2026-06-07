@@ -58,6 +58,24 @@ export const api = {
 
   onboard: body => req('POST', '/onboarding', body),
 
+  // Returns the raw Response for SSE streaming of the plan generation stages
+  onboardStream: form => {
+    const qs = new URLSearchParams({
+      goals: form.goals,
+      duration_days: form.duration_days,
+      aesthetic: form.aesthetic,
+      life_area: form.life_area,
+      why_now: form.why_now,
+      past_blockers: form.past_blockers,
+      hours_per_day: form.hours_per_day,
+      daily_rhythm: form.daily_rhythm,
+      page_public: form.page_public,
+    }).toString()
+    return fetch(`${API}/onboarding/stream?${qs}`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    })
+  },
+
   // Account / settings
   getMe: () => req('GET', '/me'),
   updateMe: body => req('PATCH', '/me', body),

@@ -1,27 +1,37 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import OnboardingWizard from '../components/OnboardingWizard'
-import { api, getToken } from '../api'
+import OnboardingStream from '../components/OnboardingStream'
+import { getToken } from '../api'
 
 export default function Onboarding() {
   const nav = useNavigate()
-  const [busy, setBusy] = useState(false)
+  const [phase, setPhase] = useState('wizard') // 'wizard' | 'streaming'
+  const [form, setForm] = useState(null)
   const [error, setError] = useState('')
 
   useEffect(() => { if (!getToken()) nav('/') }, [nav])
 
-  const submit = async form => {
-    setBusy(true); setError('')
-    try {
-      // Save the plan and start the 7-day free trial, no payment, straight to dashboard
-      await api.onboard({ ...form, duration_days: Number(form.duration_days), hours_per_day: Number(form.hours_per_day) })
-      nav('/dashboard?welcome=1')
-    } catch (err) { setError(err.message); setBusy(false) }
+  const submit = f => {
+    setForm({ ...f, duration_days: Number(f.duration_days), hours_per_day: Number(f.hours_per_day) })
+    setError('')
+    setPhase('streaming')
+  }
+
+  if (phase === 'streaming' && form) {
+    // Cinematic streaming build, then straight to the dashboard with the 7-day trial live
+    return (
+      <OnboardingStream
+        form={form}
+        onDone={() => nav('/dashboard?welcome=1')}
+        onCancel={() => { setError('Something interrupted the build. Your answers are below.'); setPhase('wizard') }}
+      />
+    )
   }
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--white)', color: 'var(--ink)' }}>
-      <OnboardingWizard onSubmit={submit} busy={busy} error={error} mode="signup" />
+      <OnboardingWizard onSubmit={submit} busy={false} error={error} mode="signup" />
     </div>
   )
 }

@@ -112,6 +112,8 @@ server {
 
     # Allow avatar (base64) and daily proof uploads (videos up to 50MB)
     client_max_body_size 60M;
+    # Onboarding answers ride in the SSE stream query string; allow long URLs
+    large_client_header_buffers 4 16k;
 
     # Frontend API calls — mirrors the Vite dev proxy: strip the /api prefix.
     # The trailing slash on proxy_pass rewrites /api/public/x -> /public/x.

@@ -41,55 +41,200 @@ their blockers, their life area, or their why.
 - Never use em dashes or en dashes anywhere. Use periods or commas only."""
 
 
-# Stable system prompt — cached at the breakpoint so per-user prompts share it.
-_SYSTEM_PROMPT = f"""\
-{_COACH_IDENTITY}
+# ── Staged plan generation ───────────────────────────────────────────────────
+# The plan is built in named stages so the onboarding screen can stream real
+# progress (one SSE event per completed stage). generate_plan() orchestrates the
+# same stages for the non-streaming path (adding another goal).
 
-You are also a creative director: alongside the plan you design one distinctive visual identity \
-that matches the life area and the energy of the user's reason for starting. Use ALL of the \
-context you are given: life area, the goal itself, why this matters right now, what has blocked \
-them before, focused hours per day, and morning vs evening rhythm.
-- Tailor task load to their available hours and front-load the heaviest work into their peak window. \
-Never schedule more than their stated hours can hold.
-- Let their "why now" set the emotional register of the mission statement, headlines, and signal wall. \
-This is the fuel. Make them feel it.
+def plan_inputs(
+    goals: str,
+    duration_days: int,
+    aesthetic: str,
+    life_area: str | None = None,
+    why_now: str | None = None,
+    past_blockers: str | None = None,
+    hours_per_day: int | None = None,
+    daily_rhythm: str | None = None,
+) -> dict:
+    """Bundle the onboarding answers (shared by every generation stage)."""
+    return {
+        "goals": goals,
+        "duration_days": duration_days,
+        "aesthetic": aesthetic,
+        "life_area": life_area,
+        "why_now": why_now,
+        "past_blockers": past_blockers,
+        "hours_per_day": hours_per_day,
+        "daily_rhythm": daily_rhythm,
+        "num_weeks": (duration_days + 6) // 7,
+    }
 
-{_TASK_RULES}
 
-Return ONLY a single valid JSON object. No markdown fences, no code blocks, no preamble, \
-no explanation. Your response must start with {{ and end with }}.
+def _ctx_block(ctx: dict) -> str:
+    return "\n".join([
+        f"Life area: {ctx['life_area'] or 'unspecified'}",
+        f"The goal: {ctx['goals']}",
+        f"Why now (their urgency): {ctx['why_now'] or 'unspecified'}",
+        f"What has blocked them before: {ctx['past_blockers'] or 'unspecified'}",
+        f"Focused hours available per day: {ctx['hours_per_day'] if ctx['hours_per_day'] is not None else 'unspecified'}",
+        f"Daily rhythm: {ctx['daily_rhythm'] or 'unspecified'} person",
+        f"Aesthetic preference: {ctx['aesthetic']}",
+        f"Duration: {ctx['duration_days']} days ({ctx['num_weeks']} weeks)",
+    ])
 
-Required JSON schema:
-{{
-  "theme": {{
-    "color_palette": "<exactly one of: dark-ember | arctic-focus | soft-earth>",
-    "typography_variant": "<exactly one of: bold-condensed | editorial | minimal>",
-    "layout_variant": "<exactly one of: cinematic | dashboard | journal>"
-  }},
-  "mission_statement": "<2-3 sentence personal mission statement>",
-  "chapter_titles": ["<cinematic week title>", ...],
-  "day_1_signal_wall_entry": "<3-sentence narrative personal dispatch for Day 1>",
-  "daily_tasks": [
-    {{
-      "day": 1,
-      "tasks": [
-        {{"content": "<specific task for THIS goal, with its one-sentence 'why this today' rationale in the same string>", "voice_style": "<direct|motivational|reflective>"}},
-        {{"content": "...", "voice_style": "..."}},
-        {{"content": "...", "voice_style": "..."}},
-        {{"content": "...", "voice_style": "..."}},
-        {{"content": "...", "voice_style": "..."}}
-      ]
-    }}
-  ]
-}}
 
-Schema rules:
-- daily_tasks must have exactly one entry per day from day 1 through the final day
-- Each day must have exactly 5 tasks, each following the TASK GENERATION RULES above
-- chapter_titles must have one entry per week (ceil(duration_days / 7))
-- voice_style must be one of: direct, motivational, reflective
-- color_palette, typography_variant, layout_variant must be chosen based on the aesthetic preference
-"""
+async def _json_call(system: str, user: str, max_tokens: int) -> dict:
+    client = _get_client()
+    response = await client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=max_tokens,
+        system=system,
+        messages=[{"role": "user", "content": user}],
+    )
+    raw = next(b.text for b in response.content if b.type == "text").strip()
+    if raw.startswith("```"):
+        lines = raw.split("\n")
+        raw = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+    return _strip_dashes_deep(json.loads(raw))
+
+
+async def plan_analysis(ctx: dict) -> dict:
+    """Stage 1: understand the goal and the blockers. Feeds later stages."""
+    system = (
+        _COACH_IDENTITY + "\n\nYou are analyzing one person before building their plan. "
+        'Return ONLY a JSON object: {"core_challenge": "one sentence naming the real obstacle", '
+        '"approach": "one to two sentences on the strategy that fits this person", '
+        '"key_levers": ["3 to 5 short, specific levers tailored to this goal and these blockers"]}. '
+        "No preamble. Never use em dashes."
+    )
+    user = (
+        "Analyze this person honestly.\n"
+        f"Goal: {ctx['goals']}\n"
+        f"Life area: {ctx['life_area'] or 'unspecified'}\n"
+        f"Why now: {ctx['why_now'] or 'unspecified'}\n"
+        f"Past blockers: {ctx['past_blockers'] or 'unspecified'}\n"
+        f"Focused hours/day: {ctx['hours_per_day']}\n"
+        f"Rhythm: {ctx['daily_rhythm'] or 'unspecified'}"
+    )
+    return await _json_call(system, user, 800)
+
+
+async def plan_chapters(ctx: dict, analysis: dict) -> list:
+    """Stage 2: cinematic weekly chapter titles."""
+    n = ctx["num_weeks"]
+    system = (
+        _COACH_IDENTITY + "\n\nYou map the journey into cinematic weekly chapters. "
+        'Return ONLY JSON: {"chapter_titles": ["..."]}. '
+        f"Exactly {n} titles, one per week, progressing foundation to momentum to depth to mastery. "
+        "Short, evocative, specific to this goal. Never use em dashes."
+    )
+    user = (
+        f"=== CONTEXT ===\n{_ctx_block(ctx)}\n\n"
+        f"=== ANALYSIS ===\n{json.dumps(analysis)}\n\n"
+        f"Write exactly {n} chapter titles."
+    )
+    data = await _json_call(system, user, 1200)
+    return data.get("chapter_titles", [])
+
+
+async def plan_tasks(ctx: dict, analysis: dict, chapters: list) -> list:
+    """Stage 3: the full day-by-day task plan (the heaviest stage)."""
+    d = ctx["duration_days"]
+    system = (
+        f"{_COACH_IDENTITY}\n\n{_TASK_RULES}\n\n"
+        'Return ONLY JSON: {"daily_tasks": [{"day": 1, "tasks": '
+        '[{"content": "specific task with its one-sentence \'why this today\' rationale", '
+        '"voice_style": "direct|motivational|reflective"}]}]}. '
+        "Each day has exactly 5 tasks. No preamble."
+    )
+    user = (
+        f"=== CONTEXT ===\n{_ctx_block(ctx)}\n\n"
+        f"=== ANALYSIS ===\n{json.dumps(analysis)}\n\n"
+        f"=== CHAPTER MAP ===\n{json.dumps(chapters)}\n\n"
+        "=== REQUIREMENTS ===\n"
+        f"- daily_tasks: exactly {d} entries (day 1 through day {d}), 5 tasks each\n"
+        "- Every task references THIS goal, their blockers, their life area, or their why. Nothing generic.\n"
+        "- Every task states a clear completion condition and ends with a one-sentence 'why this today'.\n"
+        "- Honor the phases and align each week to its chapter title: foundation (1-3), momentum (4-10), depth (11-20), mastery (21+).\n"
+        "- From day 3 on, build explicitly on what earlier days established.\n"
+        f"- Respect their {ctx['hours_per_day'] if ctx['hours_per_day'] is not None else 'available'} hours/day. Do not over-schedule.\n"
+        f"- Schedule the heaviest tasks in their {ctx['daily_rhythm'] or 'peak'} window.\n"
+        "- Tasks in the depth phase must directly attack the blockers they named.\n"
+        "- Return only the JSON object."
+    )
+    data = await _json_call(system, user, 32000)
+    return data.get("daily_tasks", [])
+
+
+async def plan_mission(ctx: dict, analysis: dict) -> str:
+    """Stage 4: the personal mission statement."""
+    system = (
+        _COACH_IDENTITY + "\n\n"
+        'Return ONLY JSON: {"mission_statement": "2 to 3 sentences"}. '
+        "Second person, charged by their reason for starting. Never use em dashes."
+    )
+    user = (
+        f"=== CONTEXT ===\n{_ctx_block(ctx)}\n\n"
+        f"=== ANALYSIS ===\n{json.dumps(analysis)}\n\n"
+        "Write their personal mission statement."
+    )
+    data = await _json_call(system, user, 500)
+    return data.get("mission_statement", "")
+
+
+async def plan_theme(ctx: dict) -> dict:
+    """Stage 5: the visual identity."""
+    system = (
+        "You are a creative director choosing a visual identity. Return ONLY JSON: "
+        '{"color_palette": "dark-ember|arctic-focus|soft-earth", '
+        '"typography_variant": "bold-condensed|editorial|minimal", '
+        '"layout_variant": "cinematic|dashboard|journal"}. '
+        "Choose values that match the stated aesthetic preference, the life area, and the goal's energy. "
+        "Never use em dashes."
+    )
+    user = (
+        f"Aesthetic preference: {ctx['aesthetic']}\n"
+        f"Life area: {ctx['life_area'] or 'unspecified'}\n"
+        f"Goal: {ctx['goals']}"
+    )
+    return await _json_call(system, user, 300)
+
+
+async def plan_signal_day1(ctx: dict, day1_tasks: list) -> str:
+    """Stage 6: the Day 1 signal wall entry."""
+    system = (
+        _COACH_IDENTITY + "\n\nYou write the Day 1 signal wall entry, a short narrative dispatch "
+        "that makes day one feel like the start of something real. "
+        'Return ONLY JSON: {"signal_wall_entry": "3 sentences"}. Never use em dashes.'
+    )
+    tasks_txt = "; ".join(day1_tasks) if day1_tasks else "the first set of tasks"
+    user = (
+        f"Goal: {ctx['goals']}\n"
+        f"Why now: {ctx['why_now'] or 'unspecified'}\n"
+        f"Day 1 tasks: {tasks_txt}\n\n"
+        "Write the Day 1 signal wall entry."
+    )
+    data = await _json_call(system, user, 400)
+    return data.get("signal_wall_entry", "")
+
+
+def day1_contents(daily_tasks: list) -> list:
+    """Pull the day-1 task strings out of a daily_tasks structure."""
+    for entry in daily_tasks:
+        if int(entry.get("day", 0)) == 1:
+            return [t.get("content", "") for t in entry.get("tasks", [])]
+    return []
+
+
+def assemble_plan(theme: dict, mission: str, chapters: list, signal: str, tasks: list) -> dict:
+    """Combine the stage outputs into the plan dict the persistence layer expects."""
+    return _strip_dashes_deep({
+        "theme": theme,
+        "mission_statement": mission,
+        "chapter_titles": chapters,
+        "day_1_signal_wall_entry": signal,
+        "daily_tasks": tasks,
+    })
 
 
 async def generate_plan(
@@ -102,61 +247,16 @@ async def generate_plan(
     hours_per_day: int | None = None,
     daily_rhythm: str | None = None,
 ) -> dict:
-    client = _get_client()
-    num_weeks = (duration_days + 6) // 7
-
-    context_lines = [
-        f"Life area: {life_area or 'unspecified'}",
-        f"The goal: {goals}",
-        f"Why now (their urgency): {why_now or 'unspecified'}",
-        f"What has blocked them before: {past_blockers or 'unspecified'}",
-        f"Focused hours available per day: {hours_per_day if hours_per_day is not None else 'unspecified'}",
-        f"Daily rhythm: {daily_rhythm or 'unspecified'} person",
-        f"Aesthetic preference: {aesthetic}",
-        f"Duration: {duration_days} days ({num_weeks} weeks)",
-    ]
-
-    response = await client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=32000,
-        system=[
-            {
-                "type": "text",
-                "text": _SYSTEM_PROMPT,
-                "cache_control": {"type": "ephemeral"},
-            }
-        ],
-        messages=[
-            {
-                "role": "user",
-                "content": (
-                    "Generate a complete, deeply personalized accountability plan for this person.\n\n"
-                    "=== CONTEXT ===\n"
-                    + "\n".join(context_lines)
-                    + "\n\n=== REQUIREMENTS ===\n"
-                    f"- daily_tasks: exactly {duration_days} entries (day 1 through day {duration_days}), 5 tasks each\n"
-                    f"- Every task references THIS goal, their blockers, their life area, or their why. Nothing generic.\n"
-                    f"- Every task states a clear completion condition and ends with a one-sentence 'why this today'.\n"
-                    f"- Honor the day phases: foundation (1-3), momentum (4-10), depth (11-20), mastery (21+).\n"
-                    f"- From day 3 on, build explicitly on what earlier days established.\n"
-                    f"- Respect their {hours_per_day if hours_per_day is not None else 'available'} hours/day. Do not over-schedule.\n"
-                    f"- Schedule the heaviest tasks in their {daily_rhythm or 'peak'} window.\n"
-                    f"- Tasks in the depth phase must directly attack the blockers they named.\n"
-                    f"- chapter_titles: exactly {num_weeks} entries.\n"
-                    f"- Return only the JSON object, nothing else."
-                ),
-            }
-        ],
-    )
-
-    raw = next(b.text for b in response.content if b.type == "text").strip()
-
-    # Strip accidental markdown fences if Claude adds them despite instructions
-    if raw.startswith("```"):
-        lines = raw.split("\n")
-        raw = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
-
-    return _strip_dashes_deep(json.loads(raw))
+    """Non-streaming orchestration of all stages (used when adding another goal)."""
+    ctx = plan_inputs(goals, duration_days, aesthetic, life_area, why_now,
+                      past_blockers, hours_per_day, daily_rhythm)
+    analysis = await plan_analysis(ctx)
+    chapters = await plan_chapters(ctx, analysis)
+    tasks = await plan_tasks(ctx, analysis, chapters)
+    mission = await plan_mission(ctx, analysis)
+    theme = await plan_theme(ctx)
+    signal = await plan_signal_day1(ctx, day1_contents(tasks))
+    return assemble_plan(theme, mission, chapters, signal, tasks)
 
 
 async def verify_proof(task_description: str, image_bytes: bytes, media_type: str) -> dict:
