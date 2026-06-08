@@ -134,6 +134,7 @@ async def _goal_section(goal: Goal, db: AsyncSession, today: date, detailed: boo
         "status": goal.status,
         "page_public": goal.page_public,
         "streak_days": goal.streak_days,
+        "projected_outcome": goal.projected_outcome or "",
         "chapter_titles": goal.chapter_titles or [],
         "progress": {"day": day, "total_days": goal.duration_days, "pct": pct,
                      "tasks_completed": done, "tasks_total": total},

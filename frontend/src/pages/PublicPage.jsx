@@ -105,9 +105,8 @@ export default function PublicPage() {
           </button>
         </div>
         <div style={{ marginTop: 20, display: 'flex', justifyContent: 'center' }}>
-          <ShareBar dark={false} label="" name={user.name} goal={goals[0]?.description || 'my goal'}
-            day={goals[0]?.progress?.day} streakDays={heroStreak} publicUrl={typeof window !== 'undefined' ? window.location.href : ''}
-            grid={goals[0]?.grid || []} />
+          <ShareBar dark={false} label="" name={user.name} slug={user.slug} goals={goals}
+            publicUrl={typeof window !== 'undefined' ? window.location.href : ''} />
         </div>
         <div style={{ marginTop: 48, textAlign: 'center' }}>
           <span style={S.poweredBadge}><Share2 size={13} /> Powered by <strong style={{ marginLeft: 3 }}>Strykd</strong></span>

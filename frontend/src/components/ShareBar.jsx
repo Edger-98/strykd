@@ -11,6 +11,15 @@ function colorFor(d) {
   return '#1a1a1a'
 }
 
+const areaLabel = a => (a || 'goal').replace(/[-_]/g, ' ').toUpperCase()
+
+function ellipsize(ctx, text, maxW) {
+  if (ctx.measureText(text).width <= maxW) return text
+  let t = text
+  while (t.length > 1 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1)
+  return t + '…'
+}
+
 function wrap(ctx, text, x, y, maxW, lineH, maxLines) {
   const words = (text || '').split(' ')
   let line = '', lines = []
@@ -20,23 +29,39 @@ function wrap(ctx, text, x, y, maxW, lineH, maxLines) {
     else line = test
   }
   if (line) lines.push(line)
-  lines = lines.slice(0, maxLines)
+  if (lines.length > maxLines) { lines = lines.slice(0, maxLines); lines[maxLines - 1] = ellipsize(ctx, lines[maxLines - 1] + '…', maxW) }
   lines.forEach((l, i) => ctx.fillText(l, x, y + i * lineH))
   return y + lines.length * lineH
 }
 
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.arcTo(x + w, y, x + w, y + h, r)
+  ctx.arcTo(x + w, y + h, x, y + h, r)
+  ctx.arcTo(x, y + h, x, y, r)
+  ctx.arcTo(x, y, x + w, y, r)
+  ctx.closePath()
+}
+
 /**
  * Share controls: X + LinkedIn intents and an Instagram-ready square image card
- * (name, goal, streak, contribution grid) generated on a canvas for download.
+ * showing ALL active goals (name, life area, day progress, %, 14-day mini grid),
+ * total streak, and the primary goal's projected outcome. Downloads as PNG.
+ *
+ * Props: goals[] (each with description, life_area, progress{day,total_days,pct},
+ * streak_days, grid[], projected_outcome), name, slug, publicUrl.
  */
-export default function ShareBar({ goal = 'my goal', streakDays = 0, day, publicUrl = '', name = '', grid = [], dark = true, label = 'Share' }) {
-  const n = day || streakDays || 1
-  const tweet = `I'm on day ${n} of my ${goal} on Strykd. Check my progress: ${publicUrl} #accountability #strykd`
+export default function ShareBar({ goals = [], name = '', slug = '', publicUrl = '', dark = true, label = 'Share' }) {
+  const active = goals.filter(g => g && (g.status ? g.status === 'active' : true))
+  const primary = active[0] || {}
+  const totalStreak = active.reduce((s, g) => s + (g.streak_days || 0), 0)
+  const primaryDay = primary.progress?.day || primary.streak_days || 1
 
+  const tweet = `I'm on day ${primaryDay} of my ${primary.description || 'goal'} on Strykd. Check my progress: ${publicUrl} #accountability #strykd`
   const shareX = () => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}`, '_blank', 'noopener')
-
   const shareLinkedIn = () => {
-    const caption = `Day ${n} of ${goal}. I'm building accountability in public with Strykd, one day at a time. ${publicUrl} #accountability #strykd`
+    const caption = `Day ${primaryDay} of ${primary.description || 'my goal'}. I'm building accountability in public with Strykd, one day at a time. ${publicUrl} #accountability #strykd`
     navigator.clipboard?.writeText(caption).catch(() => {})
     window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(publicUrl)}`, '_blank', 'noopener')
   }
@@ -47,38 +72,79 @@ export default function ShareBar({ goal = 'my goal', streakDays = 0, day, public
     cv.width = S; cv.height = S
     const ctx = cv.getContext('2d')
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, S, S)
-    // brand
-    ctx.fillStyle = '#fff'; ctx.font = '800 40px -apple-system, Helvetica, sans-serif'
     ctx.textBaseline = 'top'
-    ctx.fillText('S T R Y K D', 80, 80)
-    ctx.fillStyle = '#FF2D2D'; ctx.fillRect(80, 140, 80, 6)
-    // name
-    if (name) { ctx.fillStyle = '#9A9A9A'; ctx.font = '500 30px -apple-system, Helvetica, sans-serif'; ctx.fillText(name.toUpperCase(), 80, 200) }
-    // goal
-    ctx.fillStyle = '#fff'; ctx.font = '800 60px -apple-system, Helvetica, sans-serif'
-    const afterGoal = wrap(ctx, goal, 80, 260, S - 160, 72, 3)
-    // streak
-    ctx.fillStyle = '#FF2D2D'; ctx.font = '800 150px -apple-system, Helvetica, sans-serif'
-    ctx.fillText(String(n), 80, afterGoal + 40)
-    const numW = ctx.measureText(String(n)).width
-    ctx.fillStyle = '#9A9A9A'; ctx.font = '700 30px -apple-system, Helvetica, sans-serif'
-    ctx.fillText('DAY', 80 + numW + 28, afterGoal + 90)
-    ctx.fillText('STREAK', 80 + numW + 28, afterGoal + 128)
-    // contribution grid (last ~14 weeks), bottom area
-    const days = grid.slice(-98)
-    const cell = 22, gap = 6, cols = Math.ceil(days.length / 7)
-    const gx = 80, gy = S - 80 - 7 * (cell + gap)
-    const offset = days.length ? new Date(days[0].date + 'T12:00:00').getDay() : 0
-    days.forEach((d, i) => {
-      const idx = i + offset
-      const col = Math.floor(idx / 7), row = idx % 7
-      ctx.fillStyle = colorFor(d)
-      ctx.fillRect(gx + col * (cell + gap), gy + row * (cell + gap), cell, cell)
+
+    // ── header (centered) ──
+    ctx.textAlign = 'center'
+    ctx.fillStyle = '#fff'; ctx.font = '800 42px -apple-system, Helvetica, sans-serif'
+    ctx.fillText('S T R Y K D', S / 2, 64)
+    ctx.fillStyle = '#FF2D2D'; roundRect(ctx, S / 2 - 44, 122, 88, 6, 3); ctx.fill()
+    if (name) { ctx.fillStyle = '#fff'; ctx.font = '800 38px -apple-system, Helvetica, sans-serif'; ctx.fillText(name, S / 2, 156) }
+    if (slug) { ctx.fillStyle = '#7A7A7A'; ctx.font = '600 26px -apple-system, Helvetica, sans-serif'; ctx.fillText('@' + slug, S / 2, 206) }
+    ctx.textAlign = 'left'
+
+    // ── goals ──
+    const shown = active.slice(0, 3)
+    const remaining = active.length - shown.length
+    const PADX = 72
+    let y = 270
+    const rowH = 168
+
+    shown.forEach(g => {
+      const p = g.progress || {}
+      // goal name
+      ctx.fillStyle = '#fff'; ctx.font = '800 40px -apple-system, Helvetica, sans-serif'
+      ctx.fillText(ellipsize(ctx, g.description || 'My goal', S - PADX * 2 - 130), PADX, y)
+      // percentage (right)
+      ctx.textAlign = 'right'
+      ctx.fillStyle = '#FF2D2D'; ctx.font = '800 40px -apple-system, Helvetica, sans-serif'
+      ctx.fillText(`${p.pct ?? 0}%`, S - PADX, y)
+      ctx.textAlign = 'left'
+      // meta: area label + Day X of Y
+      ctx.fillStyle = '#FF6B6B'; ctx.font = '700 22px -apple-system, Helvetica, sans-serif'
+      const area = areaLabel(g.life_area)
+      ctx.fillText(area, PADX, y + 54)
+      const areaW = ctx.measureText(area).width
+      ctx.fillStyle = '#8A8A8A'; ctx.font = '600 22px -apple-system, Helvetica, sans-serif'
+      ctx.fillText(`·  Day ${p.day || 1} of ${p.total_days || g.duration_days || '?'}`, PADX + areaW + 16, y + 54)
+      // mini grid: last 14 non-future days
+      const recent = (g.grid || []).filter(d => !d.is_future).slice(-14)
+      const cell = 38, gap = 8
+      recent.forEach((d, i) => {
+        ctx.fillStyle = colorFor(d)
+        roundRect(ctx, PADX + i * (cell + gap), y + 92, cell, cell, 6); ctx.fill()
+      })
+      // divider
+      ctx.strokeStyle = '#1C1C1C'; ctx.lineWidth = 1
+      ctx.beginPath(); ctx.moveTo(PADX, y + rowH - 12); ctx.lineTo(S - PADX, y + rowH - 12); ctx.stroke()
+      y += rowH
     })
+
+    if (remaining > 0) {
+      ctx.fillStyle = '#8A8A8A'; ctx.font = '700 26px -apple-system, Helvetica, sans-serif'
+      ctx.fillText(`+${remaining} more goal${remaining > 1 ? 's' : ''}`, PADX, y + 4)
+      y += 44
+    }
+
+    // ── bottom: total streak + projected outcome ──
+    const by = Math.max(y + 20, 824)
+    ctx.fillStyle = '#FF2D2D'; ctx.font = '800 86px -apple-system, Helvetica, sans-serif'
+    ctx.fillText(String(totalStreak), PADX, by)
+    const numW = ctx.measureText(String(totalStreak)).width
+    ctx.fillStyle = '#8A8A8A'; ctx.font = '700 22px -apple-system, Helvetica, sans-serif'
+    ctx.fillText('TOTAL DAY', PADX + numW + 22, by + 18)
+    ctx.fillText('STREAK', PADX + numW + 22, by + 48)
+
+    const proj = (primary.projected_outcome || '').trim()
+    if (proj) {
+      ctx.fillStyle = '#A8A8A8'; ctx.font = '500 25px -apple-system, Helvetica, sans-serif'
+      wrap(ctx, proj, PADX, by + 116, S - PADX * 2, 34, 2)
+    }
+
     // footer
-    const slug = (publicUrl || '').replace(/^https?:\/\//, '').replace(/\/$/, '')
-    ctx.fillStyle = '#5C5C5C'; ctx.font = '600 26px -apple-system, Helvetica, sans-serif'
-    ctx.fillText(slug || 'strykdapp.com', 80, S - 56)
+    ctx.fillStyle = '#5C5C5C'; ctx.font = '600 24px -apple-system, Helvetica, sans-serif'
+    const foot = (publicUrl || '').replace(/^https?:\/\//, '').replace(/\/$/, '') || 'strykdapp.com'
+    ctx.fillText(foot, PADX, S - 50)
 
     const a = document.createElement('a')
     a.href = cv.toDataURL('image/png')

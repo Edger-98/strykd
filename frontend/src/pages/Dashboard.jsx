@@ -209,9 +209,8 @@ export default function Dashboard() {
                 <ContributionGrid days={activeGoal.grid} dark onPickDay={setGridDay} />
                 {user.page_public !== false && (
                   <div style={{ marginTop: 18 }}>
-                    <ShareBar dark name={user.name} goal={activeGoal.description}
-                      day={activeGoal.progress?.day} streakDays={activeGoal.streak_days}
-                      publicUrl={`${window.location.origin}/${user.slug}`} grid={activeGoal.grid} />
+                    <ShareBar dark name={user.name} slug={user.slug} goals={goals}
+                      publicUrl={`${window.location.origin}/${user.slug}`} />
                   </div>
                 )}
               </section>
