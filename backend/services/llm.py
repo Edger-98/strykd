@@ -83,8 +83,10 @@ def _ctx_block(ctx: dict) -> str:
     ])
 
 
-async def _json_call(system: str, user: str, max_tokens: int) -> dict:
-    client = _get_client()
+async def _json_call(system: str, user: str, max_tokens: int, timeout: float = 60.0) -> dict:
+    # max_retries=0 so the timeout is a real hard ceiling. The SDK otherwise
+    # retries timeouts up to twice, tripling the effective wait.
+    client = _get_client().with_options(max_retries=0, timeout=timeout)
     response = await client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=max_tokens,
@@ -137,9 +139,14 @@ async def plan_chapters(ctx: dict, analysis: dict) -> list:
     return data.get("chapter_titles", [])
 
 
-async def plan_tasks(ctx: dict, analysis: dict, chapters: list) -> list:
-    """Stage 3: the full day-by-day task plan (the heaviest stage)."""
-    d = ctx["duration_days"]
+# Only the opening days of tasks are generated up front so the heaviest stage
+# stays well under the 60s timeout regardless of total goal length (these rich
+# tasks generate at roughly 12s/day, so 3 days lands near 45s). The nightly cron
+# rolls the rest forward day by day (see routes/cron.py).
+SEED_DAYS = 3
+
+
+async def _gen_tasks(ctx: dict, analysis: dict, chapters: list, n_days: int, timeout: float = 60.0) -> list:
     system = (
         f"{_COACH_IDENTITY}\n\n{_TASK_RULES}\n\n"
         'Return ONLY JSON: {"daily_tasks": [{"day": 1, "tasks": '
@@ -147,23 +154,52 @@ async def plan_tasks(ctx: dict, analysis: dict, chapters: list) -> list:
         '"voice_style": "direct|motivational|reflective"}]}]}. '
         "Each day has exactly 5 tasks. No preamble."
     )
+    total = ctx["duration_days"]
     user = (
         f"=== CONTEXT ===\n{_ctx_block(ctx)}\n\n"
         f"=== ANALYSIS ===\n{json.dumps(analysis)}\n\n"
         f"=== CHAPTER MAP ===\n{json.dumps(chapters)}\n\n"
         "=== REQUIREMENTS ===\n"
-        f"- daily_tasks: exactly {d} entries (day 1 through day {d}), 5 tasks each\n"
+        f"- This is a {total}-day plan. Generate ONLY the first {n_days} days now (day 1 through day {n_days}).\n"
+        f"- daily_tasks: exactly {n_days} entries, 5 tasks each\n"
         "- Every task references THIS goal, their blockers, their life area, or their why. Nothing generic.\n"
         "- Every task states a clear completion condition and ends with a one-sentence 'why this today'.\n"
-        "- Honor the phases and align each week to its chapter title: foundation (1-3), momentum (4-10), depth (11-20), mastery (21+).\n"
+        "- These are the opening days: foundation work that later days build on. Establish baselines, create systems, remove friction.\n"
         "- From day 3 on, build explicitly on what earlier days established.\n"
         f"- Respect their {ctx['hours_per_day'] if ctx['hours_per_day'] is not None else 'available'} hours/day. Do not over-schedule.\n"
         f"- Schedule the heaviest tasks in their {ctx['daily_rhythm'] or 'peak'} window.\n"
-        "- Tasks in the depth phase must directly attack the blockers they named.\n"
         "- Return only the JSON object."
     )
-    data = await _json_call(system, user, 32000)
+    data = await _json_call(system, user, 8000, timeout=timeout)
     return data.get("daily_tasks", [])
+
+
+def _fallback_day1(analysis: dict) -> list:
+    """Minimal day-1 plan from the analysis levers, used only if generation times out."""
+    levers = [str(x) for x in (analysis.get("key_levers") or []) if x][:5]
+    while len(levers) < 5:
+        levers.append("Take one concrete step toward your goal today.")
+    return [{"day": 1, "tasks": [{"content": l, "voice_style": "direct"} for l in levers]}]
+
+
+async def plan_tasks(ctx: dict, analysis: dict, chapters: list) -> list:
+    """Stage 3: seed the opening days of tasks (bounded for speed).
+
+    60s timeout per attempt; on timeout retry a smaller window, then fall back to
+    a minimal day-1 plan so the user is never left with nothing. The nightly cron
+    fills in the remaining days of the plan over time.
+    """
+    seed = min(ctx["duration_days"], SEED_DAYS)
+    try:
+        return await _gen_tasks(ctx, analysis, chapters, seed)
+    except anthropic.APITimeoutError:
+        # Partial plan: a single day generates fast; the cron fills the rest.
+        if seed > 1:
+            try:
+                return await _gen_tasks(ctx, analysis, chapters, 1)
+            except anthropic.APITimeoutError:
+                pass
+        return _fallback_day1(analysis)
 
 
 async def plan_mission(ctx: dict, analysis: dict) -> str:
