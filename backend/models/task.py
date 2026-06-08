@@ -27,6 +27,14 @@ class DailyTask(Base):
     proof_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     proof_review: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
+    # Premium todo fields (used by manual quick tasks / todo mode)
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    priority: Mapped[str | None] = mapped_column(String, nullable=True)  # high | medium | low
+    tags: Mapped[list | None] = mapped_column(JSONB, nullable=True)  # list[str]
+    recurring: Mapped[str | None] = mapped_column(String, nullable=True)  # daily | weekly
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("daily_tasks.id"), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     __table_args__ = (
         Index("ix_daily_tasks_goal_date", "goal_id", "task_date"),
         Index("ix_daily_tasks_user_date", "user_id", "task_date"),

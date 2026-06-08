@@ -5,6 +5,7 @@ import { AnimatePresence } from 'framer-motion'
 import './styles.css'
 import Dashboard from './pages/Dashboard'
 import Journey from './pages/Journey'
+import Tasks from './pages/Tasks'
 import Settings from './pages/Settings'
 import Landing from './pages/Landing'
 import Onboarding from './pages/Onboarding'
@@ -20,6 +21,7 @@ function AnimatedRoutes() {
         <Route path="/onboard" element={<Onboarding />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/dashboard/journey" element={<Journey />} />
+        <Route path="/dashboard/tasks" element={<Tasks />} />
         <Route path="/dashboard/settings" element={<Settings />} />
         <Route path="/reset-password/:token" element={<ResetPassword />} />
         <Route path="/:slug" element={<PublicPage />} />

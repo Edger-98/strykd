@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { LayoutGrid, Map, Radio, Settings, ExternalLink, LogOut, X, Plus } from 'lucide-react'
+import { LayoutGrid, Map, Radio, Settings, ExternalLink, LogOut, X, Plus, ListChecks } from 'lucide-react'
 import Avatar from './Avatar'
 
 /**
@@ -28,6 +28,7 @@ export default function DashSidebar({ user, active, navOpen, setNavOpen, onLogou
 
         <nav style={S.navList}>
           <Item active={active === 'today'} Icon={LayoutGrid} label="Today" onClick={() => go('/dashboard')} />
+          <Item active={active === 'tasks'} Icon={ListChecks} label="Tasks" onClick={() => go('/dashboard/tasks')} />
           <Item active={active === 'journey'} Icon={Map} label="Journey" onClick={() => go('/dashboard/journey')} />
           <Item active={active === 'signal'} Icon={Radio} label="Signal Wall" onClick={() => go('/dashboard?tab=signal')} />
           <Item active={active === 'settings'} Icon={Settings} label="Settings" onClick={() => go('/dashboard/settings')} />

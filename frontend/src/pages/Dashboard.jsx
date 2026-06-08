@@ -225,7 +225,12 @@ export default function Dashboard() {
 
             {/* Quick tasks (manual, no goal needed) */}
             <section style={{ marginTop: 44 }}>
-              <h2 className="eyebrow" style={S.sectionTitle}>Your tasks</h2>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', borderBottom: '1px solid var(--d-line)', marginBottom: 8, paddingBottom: 12 }}>
+                <h2 className="eyebrow" style={{ color: 'var(--d-text-muted)' }}>Your tasks</h2>
+                <button onClick={() => nav('/dashboard/tasks')} style={{ background: 'none', border: 'none', color: 'var(--blue)', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>
+                  Manage all tasks →
+                </button>
+              </div>
               <div style={S.quickRow}>
                 <input value={quickInput} onChange={e => setQuickInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && addQuick()} placeholder="Add a quick task and press Enter"

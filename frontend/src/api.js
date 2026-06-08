@@ -64,6 +64,12 @@ export const api = {
   uploadTaskProof: (taskId, file) => upload(`/tasks/${taskId}/proof`, file),
   uploadDailyProof: (goalId, file) => upload(`/goals/${goalId}/daily-proof`, file),
 
+  // Premium todo mode
+  getTodos: () => req('GET', '/todos'),
+  createTodo: body => req('POST', '/todos', body),
+  updateTodo: (id, body) => req('PATCH', `/todos/${id}`, body),
+  deleteTodo: id => req('DELETE', `/todos/${id}`),
+
   onboard: body => req('POST', '/onboarding', body),
 
   // Goal clarification chat: returns {type:'question'|'refined', message, refined_goal?}
