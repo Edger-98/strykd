@@ -11,6 +11,7 @@ import Landing from './pages/Landing'
 import Onboarding from './pages/Onboarding'
 import PublicPage from './pages/PublicPage'
 import ResetPassword from './pages/ResetPassword'
+import SharedListPage from './pages/SharedListPage'
 
 function AnimatedRoutes() {
   const location = useLocation()
@@ -24,6 +25,7 @@ function AnimatedRoutes() {
         <Route path="/dashboard/tasks" element={<Tasks />} />
         <Route path="/dashboard/settings" element={<Settings />} />
         <Route path="/reset-password/:token" element={<ResetPassword />} />
+        <Route path="/shared/:code" element={<SharedListPage />} />
         <Route path="/:slug" element={<PublicPage />} />
       </Routes>
     </AnimatePresence>

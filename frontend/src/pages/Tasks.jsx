@@ -100,8 +100,80 @@ export default function Tasks() {
                 onToggle={toggle} onRemove={remove} onChanged={load} />
             ))}
         </div>
+
+        <SharedLists />
       </motion.main>
     </div>
+  )
+}
+
+function SharedLists() {
+  const [lists, setLists] = useState(null)
+  const [name, setName] = useState('')
+  const [desc, setDesc] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [open, setOpen] = useState(false)
+  const [copied, setCopied] = useState('')
+  const [genBusy, setGenBusy] = useState('')
+
+  const load = useCallback(() => { api.getSharedLists().then(d => setLists(d.lists)).catch(() => setLists([])) }, [])
+  useEffect(() => { load() }, [load])
+
+  const create = async () => {
+    const n = name.trim(); if (!n || busy) return
+    setBusy(true)
+    try { await api.createSharedList({ name: n, description: desc.trim() || undefined }); setName(''); setDesc(''); setOpen(false); load() }
+    catch (e) { /* ignore */ } finally { setBusy(false) }
+  }
+  const copy = (url, code) => { navigator.clipboard?.writeText(url).catch(() => {}); setCopied(code); setTimeout(() => setCopied(''), 1800) }
+  const generate = async code => {
+    setGenBusy(code)
+    try { await api.generateItinerary(code); load() } catch (e) { /* ignore */ } finally { setGenBusy('') }
+  }
+  const remove = async code => {
+    if (!window.confirm('Delete this shared list? Everyone with the link loses access.')) return
+    await api.deleteSharedList(code).catch(() => {}); load()
+  }
+
+  return (
+    <section style={{ marginTop: 48 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--d-line)', paddingBottom: 12, marginBottom: 14 }}>
+        <h2 className="eyebrow" style={{ color: 'var(--d-text-muted)' }}>Shared lists</h2>
+        <button onClick={() => setOpen(o => !o)} style={{ background: 'none', border: 'none', color: 'var(--blue)', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>
+          {open ? 'Close' : '+ New shared list'}
+        </button>
+      </div>
+      <p style={{ color: 'var(--d-text-muted)', fontSize: '0.85rem', marginBottom: 14 }}>
+        Collaborative checklists anyone can open and edit with a link. Great for trips, events, group projects.
+      </p>
+
+      {open && (
+        <div style={{ ...S.addWrap, marginBottom: 16 }}>
+          <input className="d-field" placeholder="List name (e.g. Maya's Birthday Weekend)" value={name} onChange={e => setName(e.target.value)} />
+          <input className="d-field" placeholder="Description (optional)" value={desc} onChange={e => setDesc(e.target.value)} style={{ marginTop: 8 }} />
+          <button className="pill pill-blue pill-sm" onClick={create} disabled={busy} style={{ marginTop: 10 }}>
+            {busy ? <Loader2 size={15} className="spin-icon" /> : 'Create shared list'}
+          </button>
+        </div>
+      )}
+
+      {(lists || []).map(l => (
+        <div key={l.unique_code} style={S.sharedCard}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700 }}>{l.name}</div>
+            <div style={{ color: 'var(--d-text-muted)', fontSize: '0.8rem', marginTop: 2 }}>{l.done_count}/{l.task_count} done · /shared/{l.unique_code}</div>
+          </div>
+          <button onClick={() => copy(l.share_url, l.unique_code)} style={S.smallBtn}>{copied === l.unique_code ? 'Copied' : 'Copy link'}</button>
+          <button onClick={() => generate(l.unique_code)} disabled={!!genBusy} style={S.smallBtn}>
+            {genBusy === l.unique_code ? <Loader2 size={13} className="spin-icon" /> : (l.itinerary ? 'Redo itinerary' : 'Itinerary')}
+          </button>
+          <button onClick={() => remove(l.unique_code)} style={{ ...S.smallBtn, color: 'var(--red)' }}>Delete</button>
+        </div>
+      ))}
+      {lists && lists.length === 0 && !open && (
+        <p style={{ color: 'var(--d-text-muted)', fontSize: '0.88rem' }}>No shared lists yet.</p>
+      )}
+    </section>
   )
 }
 
@@ -262,4 +334,8 @@ const S = {
   iconBtn: { background: 'transparent', border: 'none', color: 'var(--d-text-muted)', padding: 4, display: 'grid', placeItems: 'center', cursor: 'pointer', flexShrink: 0, transition: 'opacity 0.15s' },
   notes: { color: 'var(--d-text-dim)', fontSize: '0.86rem', lineHeight: 1.5, marginBottom: 10, background: 'var(--d-card)', padding: '10px 12px', borderRadius: 10 },
   subRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0' },
+  sharedCard: { display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: 'var(--d-card)',
+    border: '1px solid var(--d-line)', borderRadius: 12, marginBottom: 10, flexWrap: 'wrap' },
+  smallBtn: { background: 'var(--d-bg)', border: '1px solid var(--d-line)', color: 'var(--d-text-dim)', borderRadius: 50,
+    padding: '6px 12px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5 },
 }

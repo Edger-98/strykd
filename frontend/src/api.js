@@ -46,6 +46,20 @@ async function upload(path, file) {
   return res.json()
 }
 
+// No-auth JSON request (public collaborative endpoints)
+async function publicJson(method, path, body) {
+  const res = await fetch(`${API}${path}`, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body != null ? JSON.stringify(body) : undefined,
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    throw Object.assign(new Error(err.detail || 'Request failed'), { status: res.status })
+  }
+  return res.json()
+}
+
 export const api = {
   register: body => req('POST', '/auth/register', body),
   login: body => req('POST', '/auth/login', body),
@@ -69,6 +83,15 @@ export const api = {
   createTodo: body => req('POST', '/todos', body),
   updateTodo: (id, body) => req('PATCH', `/todos/${id}`, body),
   deleteTodo: id => req('DELETE', `/todos/${id}`),
+
+  // Shared collaborative lists (owner = auth, guests = public)
+  createSharedList: body => req('POST', '/shared-lists', body),
+  getSharedLists: () => req('GET', '/shared-lists'),
+  deleteSharedList: code => req('DELETE', `/shared-lists/${code}`),
+  generateItinerary: code => req('POST', `/shared-lists/${code}/itinerary`),
+  getSharedList: code => fetch(`${API}/shared/${code}`).then(r => r.ok ? r.json() : Promise.reject(r)),
+  addSharedTask: (code, body) => publicJson('POST', `/shared/${code}/tasks`, body),
+  toggleSharedTask: (code, id, body) => publicJson('PATCH', `/shared/${code}/tasks/${id}`, body),
 
   onboard: body => req('POST', '/onboarding', body),
 

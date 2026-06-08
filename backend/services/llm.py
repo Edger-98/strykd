@@ -114,6 +114,24 @@ _CLARIFY_SYSTEM = (
 )
 
 
+async def generate_itinerary(name: str, tasks: list[str]) -> dict:
+    """Turn a shared list (name + tasks) into a structured itinerary."""
+    system = (
+        "You are a world-class planner. Given an event or trip name and a list of tasks, produce a "
+        "clear, structured plan. Return ONLY JSON: "
+        '{"time_blocks": [{"time": "Friday evening", "title": "...", "detail": "one sentence"}], '
+        '"suggestions": ["3 to 6 helpful ideas not already in the list"], '
+        '"packing_list": ["6 to 12 concrete items to bring or prepare"]}. '
+        "Keep it concise and practical. Never use em dashes; use commas or periods. No preamble."
+    )
+    user = (
+        f"Name: {name}\n"
+        f"Existing tasks:\n" + ("\n".join(f"- {t}" for t in tasks) if tasks else "(none yet)")
+        + "\n\nBuild the itinerary."
+    )
+    return await _json_call(system, user, 2000)
+
+
 async def clarify_goal(conversation: list[dict], life_area: str | None = None) -> dict:
     """One turn of the goal-clarification chat.
 
