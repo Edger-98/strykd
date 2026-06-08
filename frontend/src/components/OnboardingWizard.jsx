@@ -28,11 +28,11 @@ const AESTHETICS = [
  *   onSubmit(form) -> Promise (set `busy` true while it runs)
  * mode: 'signup' (default) or 'add' (adding another goal in a modal).
  */
-export default function OnboardingWizard({ onSubmit, busy, error, mode = 'signup', onClose }) {
+export default function OnboardingWizard({ onSubmit, busy, error, mode = 'signup', onClose, initialForm }) {
   const [step, setStep] = useState(0)
   const [dir, setDir] = useState(1)
   const [localErr, setLocalErr] = useState('')
-  const [form, setForm] = useState({
+  const [form, setForm] = useState(initialForm || {
     goals: '', life_area: '', why_now: '', past_blockers: '',
     duration_days: 7, hours_per_day: 2, daily_rhythm: '',
     aesthetic: '', page_public: true,

@@ -31,7 +31,7 @@ export default function Onboarding() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--white)', color: 'var(--ink)' }}>
-      <OnboardingWizard onSubmit={submit} busy={false} error={error} mode="signup" />
+      <OnboardingWizard onSubmit={submit} busy={false} error={error} mode="signup" initialForm={form || undefined} />
     </div>
   )
 }
