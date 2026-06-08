@@ -7,6 +7,7 @@ import Avatar from '../components/Avatar'
 import ContributionGrid from '../components/ContributionGrid'
 import DayDrawer from '../components/DayDrawer'
 import ShareBar from '../components/ShareBar'
+import { imgForArea } from '../lifeAreas'
 import { inView, revealVariants } from '../motion'
 import { api } from '../api'
 
@@ -41,8 +42,37 @@ export default function PublicPage() {
   const t = THEMES[theme?.color_palette] || THEMES['arctic-focus']
   const heroStreak = Math.max(user.streak_days || 0, ...goals.map(g => g.streak_days || 0), 0)
 
+  const primary = goals[0]
+  const projected = (primary?.projected_outcome || theme?.mission_statement || primary?.description || '').trim()
+
   return (
     <div style={{ background: '#fff', minHeight: '100vh' }}>
+      {/* ── Projected-outcome hero: the destination, first thing visitors see ── */}
+      {primary && projected && (
+        <section style={{ ...S.projHero, backgroundImage: `linear-gradient(rgba(0,0,0,0.62), rgba(0,0,0,0.82)), url(${imgForArea(primary.life_area)})` }}>
+          <div style={S.projInner}>
+            <motion.span style={S.projEyebrow} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+              THE DESTINATION
+            </motion.span>
+            <motion.h1 className="display" style={S.projText}
+              initial={{ opacity: 0, y: 26 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}>
+              {firstSentence(projected)}
+            </motion.h1>
+            <motion.p style={S.projSub} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
+              If {user.name.split(' ')[0]} shows up every day.
+            </motion.p>
+            {primary.progress && (
+              <motion.span style={S.projPill} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.55 }}>
+                Day {primary.progress.day} of {primary.progress.total_days}
+              </motion.span>
+            )}
+            <motion.div style={S.projScroll} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.9 }}>
+              <ArrowDown size={16} /> Scroll to see the journey
+            </motion.div>
+          </div>
+        </section>
+      )}
+
       {/* ── Cinematic themed hero ── */}
       <section style={{ ...S.hero, background: t.bg, color: t.fg }}>
         <div style={S.heroInner}>
@@ -326,6 +356,16 @@ const S = {
   headline: { fontSize: 'clamp(1.05rem, 2vw, 1.4rem)', fontWeight: 600, marginTop: 24, maxWidth: 560 },
   scroll: { display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.74rem', letterSpacing: '0.15em', fontWeight: 600, paddingBottom: 10 },
   poweredBadge: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 50, background: 'var(--gray-section)', color: 'var(--gray-text)', fontSize: '0.82rem' },
+  projHero: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    backgroundSize: 'cover', backgroundPosition: 'center', color: '#fff', textAlign: 'center' },
+  projInner: { maxWidth: 880, padding: '60px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center' },
+  projEyebrow: { fontSize: '0.8rem', letterSpacing: '0.24em', fontWeight: 700, color: 'rgba(255,255,255,0.65)', marginBottom: 28 },
+  projText: { fontSize: 'clamp(2.2rem, 6vw, 4.6rem)', fontWeight: 800, lineHeight: 1.08, letterSpacing: '-0.02em' },
+  projSub: { fontSize: 'clamp(1.05rem, 2.4vw, 1.5rem)', color: 'rgba(255,255,255,0.8)', marginTop: 28, fontWeight: 500 },
+  projPill: { marginTop: 32, padding: '10px 22px', borderRadius: 50, border: '1px solid rgba(255,255,255,0.5)',
+    fontSize: '0.92rem', fontWeight: 700, letterSpacing: '0.04em' },
+  projScroll: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 56, fontSize: '0.78rem',
+    letterSpacing: '0.12em', fontWeight: 600, color: 'rgba(255,255,255,0.7)' },
   proofGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10 },
   proofCell: { position: 'relative', display: 'block', aspectRatio: '1', borderRadius: 12, overflow: 'hidden',
     background: 'var(--gray-section)', border: '1px solid var(--gray-line)' },
