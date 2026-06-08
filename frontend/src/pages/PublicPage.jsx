@@ -6,6 +6,7 @@ import SignalWall from '../components/SignalWall'
 import Avatar from '../components/Avatar'
 import ContributionGrid from '../components/ContributionGrid'
 import DayDrawer from '../components/DayDrawer'
+import ShareBar from '../components/ShareBar'
 import { inView, revealVariants } from '../motion'
 import { api } from '../api'
 
@@ -102,6 +103,11 @@ export default function PublicPage() {
           <button className="pill pill-dark pill-lg" onClick={share}>
             {copied ? <><Check size={18} /> Copied!</> : <><Link2 size={18} /> Share my page</>}
           </button>
+        </div>
+        <div style={{ marginTop: 20, display: 'flex', justifyContent: 'center' }}>
+          <ShareBar dark={false} label="" name={user.name} goal={goals[0]?.description || 'my goal'}
+            day={goals[0]?.progress?.day} streakDays={heroStreak} publicUrl={typeof window !== 'undefined' ? window.location.href : ''}
+            grid={goals[0]?.grid || []} />
         </div>
         <div style={{ marginTop: 48, textAlign: 'center' }}>
           <span style={S.poweredBadge}><Share2 size={13} /> Powered by <strong style={{ marginLeft: 3 }}>Strykd</strong></span>

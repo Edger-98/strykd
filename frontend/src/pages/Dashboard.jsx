@@ -12,6 +12,7 @@ import DashSidebar, { SIDEBAR_W } from '../components/DashSidebar'
 import AddGoalModal from '../components/AddGoalModal'
 import ContributionGrid from '../components/ContributionGrid'
 import DayDrawer from '../components/DayDrawer'
+import ShareBar from '../components/ShareBar'
 import { useCountUp } from '../hooks'
 import { pageVariants } from '../motion'
 import { api, clearToken, getToken } from '../api'
@@ -206,6 +207,13 @@ export default function Dashboard() {
               <section style={{ marginBottom: 36 }}>
                 <h2 className="eyebrow" style={S.sectionTitle}>Consistency</h2>
                 <ContributionGrid days={activeGoal.grid} dark onPickDay={setGridDay} />
+                {user.page_public !== false && (
+                  <div style={{ marginTop: 18 }}>
+                    <ShareBar dark name={user.name} goal={activeGoal.description}
+                      day={activeGoal.progress?.day} streakDays={activeGoal.streak_days}
+                      publicUrl={`${window.location.origin}/${user.slug}`} grid={activeGoal.grid} />
+                  </div>
+                )}
               </section>
             )}
 
