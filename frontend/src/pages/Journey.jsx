@@ -10,14 +10,7 @@ import AddGoalModal from '../components/AddGoalModal'
 import { pageVariants } from '../motion'
 import { api, clearToken, getToken } from '../api'
 
-const LIFE_AREA_IMG = {
-  career: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=1200&q=80',
-  fitness: 'https://images.unsplash.com/photo-1534258936925-c58bed479fcb?w=1200&q=80',
-  business: 'https://images.unsplash.com/photo-1556761175-4b46a572b786?w=1200&q=80',
-  creative: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=1200&q=80',
-  'personal-growth': 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=1200&q=80',
-}
-const imgFor = la => LIFE_AREA_IMG[(la || '').replace('_', '-')] || LIFE_AREA_IMG.career
+import { imgForArea as imgFor } from '../lifeAreas'
 const fmtDate = iso => new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 
 export default function Journey() {

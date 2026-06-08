@@ -2,22 +2,21 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowLeft, ArrowRight, Briefcase, Dumbbell, Rocket, Palette, Sprout,
-  Sunrise, Moon, Globe, Lock, X,
+  Sunrise, Moon, Globe, Lock, X, Heart, DollarSign, GraduationCap, Plane,
+  Brain, Lightbulb, Sun, Pencil,
 } from 'lucide-react'
 import { stepVariants } from '../motion'
 import GoalChat from './GoalChat'
+import { LIFE_AREAS, RECOMMENDED_GOALS } from '../lifeAreas'
 
 const STEP_BG = {
   goals: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1440&q=80',
-  life_area: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=1440&q=80',
 }
-const LIFE_AREAS = [
-  { id: 'career', label: 'Career', Icon: Briefcase },
-  { id: 'fitness', label: 'Fitness', Icon: Dumbbell },
-  { id: 'business', label: 'Business', Icon: Rocket },
-  { id: 'creative', label: 'Creative', Icon: Palette },
-  { id: 'personal-growth', label: 'Personal Growth', Icon: Sprout },
-]
+const LIFE_ICONS = {
+  career: Briefcase, fitness: Dumbbell, business: Rocket, creative: Palette,
+  'personal-growth': Sprout, sobriety: Sun, relationships: Heart, finance: DollarSign,
+  education: GraduationCap, travel: Plane, mindfulness: Brain, 'side-project': Lightbulb,
+}
 const AESTHETICS = [
   { id: 'dark-ember', label: 'Dark Ember', desc: 'Bold, intense, fire-forged', bg: '#1A0E08', fg: '#F5EDE6', accent: '#FF5A1F' },
   { id: 'arctic-focus', label: 'Arctic Focus', desc: 'Clean, sharp, clinical', bg: '#F2F8FF', fg: '#0B1B2B', accent: '#0071E3' },
@@ -42,22 +41,49 @@ export default function OnboardingWizard({ onSubmit, busy, error, mode = 'signup
   const addMode = mode === 'add'
 
   const steps = [
+    { key: 'life_area', q: 'Which part of your life?', sub: 'Pick an area, then choose a starter goal or write your own.',
+      valid: () => !!form.life_area, custom: true,
+      render: () => {
+        const recs = RECOMMENDED_GOALS[form.life_area] || []
+        return (
+          <div>
+            <div style={St.areaGrid}>
+              {LIFE_AREAS.map(a => {
+                const Icon = LIFE_ICONS[a.id] || Sprout
+                const active = form.life_area === a.id
+                return (
+                  <button type="button" key={a.id} onClick={() => set('life_area', a.id)}
+                    style={{ ...St.areaCard, outline: active ? '3px solid var(--red)' : '1px solid var(--gray-line)',
+                      outlineOffset: active ? -1 : -1 }}>
+                    <img src={a.img} alt="" loading="lazy" style={St.areaImg} />
+                    <span style={St.areaShade} />
+                    <span style={St.areaLabel}><Icon size={15} /> {a.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {form.life_area && (
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ marginTop: 24 }}>
+                <p style={St.recEyebrow}>POPULAR {(LIFE_AREAS.find(a => a.id === form.life_area)?.label || '').toUpperCase()} GOALS</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+                  {recs.map(g => (
+                    <button type="button" key={g} onClick={() => pickGoal(form.life_area, g)} style={St.recCard}>
+                      <span>{g}</span> <ArrowRight size={16} style={{ flexShrink: 0, opacity: 0.5 }} />
+                    </button>
+                  ))}
+                  <button type="button" onClick={() => pickGoal(form.life_area, '')} style={St.recOwn}>
+                    <Pencil size={15} /> Write my own goal
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </div>
+        )
+      } },
     { key: 'goals', q: 'Let us get clear on your goal.', sub: "Tell me what's on your mind and I'll ask a few questions to sharpen it.",
       valid: () => form.goals.trim().length > 3, chat: true,
       render: () => <GoalChat lifeArea={form.life_area} initialGoal={form.goals} onApprove={approveGoal} /> },
-    { key: 'life_area', q: 'Which part of your life?', sub: 'This shapes the structure of your plan.',
-      valid: () => !!form.life_area,
-      render: () => (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
-          {LIFE_AREAS.map(a => (
-            <Choice key={a.id} active={form.life_area === a.id} onClick={() => { set('life_area', a.id); advance('life_area') }}
-              style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 12 }}>
-              <a.Icon size={24} color={form.life_area === a.id ? 'var(--red)' : 'var(--gray-text)'} />
-              <span style={{ fontWeight: 700 }}>{a.label}</span>
-            </Choice>
-          ))}
-        </div>
-      ) },
     { key: 'why_now', q: 'Why now?', sub: "What's the urgency? This becomes the fuel.",
       valid: () => form.why_now.trim().length > 3, text: true,
       render: () => <textarea autoFocus className="field" style={St.textarea}
@@ -148,8 +174,13 @@ export default function OnboardingWizard({ onSubmit, busy, error, mode = 'signup
     setForm(f => ({ ...f, goals: refinedGoal }))
     setLocalErr(''); setDir(1); setStep(s => s + 1)
   }
+  // Life-area step: lock in the area (+ optional starter goal) and move to the chat.
+  const pickGoal = (area, goal) => {
+    setForm(f => ({ ...f, life_area: area, goals: goal }))
+    setLocalErr(''); setDir(1); setStep(s => s + 1)
+  }
   const onKey = e => {
-    if (cur.chat) return  // the chat handles its own keys
+    if (cur.chat || cur.custom) return  // these steps manage their own input
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); advance() }
     else if (e.key === 'Enter' && !e.shiftKey && !cur.text) { e.preventDefault(); advance() }
   }
@@ -189,10 +220,10 @@ export default function OnboardingWizard({ onSubmit, busy, error, mode = 'signup
           <AnimatePresence mode="wait" custom={dir}>
             <motion.div key={step} custom={dir} variants={stepVariants} initial="enter" animate="center" exit="exit" style={{ width: '100%' }}>
               <h1 className="h-xl display" style={{ marginBottom: 12 }}>{cur.q}</h1>
-              <p className="lead" style={{ marginBottom: cur.chat ? 20 : 36 }}>{cur.sub}</p>
+              <p className="lead" style={{ marginBottom: (cur.chat || cur.custom) ? 20 : 36 }}>{cur.sub}</p>
               {cur.render()}
               {(localErr || error) && <p style={St.err}>{localErr || error}</p>}
-              {!cur.chat && (
+              {!cur.chat && !cur.custom && (
                 <div style={St.nav}>
                   {step > 0 && <button className="pill pill-outline pill-sm" onClick={back}><ArrowLeft size={15} /> Back</button>}
                   <button className="pill pill-dark" onClick={() => advance()} style={{ marginLeft: 'auto' }}>
@@ -200,8 +231,8 @@ export default function OnboardingWizard({ onSubmit, busy, error, mode = 'signup
                   </button>
                 </div>
               )}
-              {/* Back link for the chat step (no Continue; the chat's approve button advances) */}
-              {cur.chat && step > 0 && (
+              {/* Back link for chat/custom steps (they advance via their own buttons) */}
+              {(cur.chat || cur.custom) && step > 0 && (
                 <div style={{ marginTop: 16 }}>
                   <button className="pill pill-outline pill-sm" onClick={back}><ArrowLeft size={15} /> Back</button>
                 </div>
@@ -251,4 +282,16 @@ const St = {
   nav: { display: 'flex', alignItems: 'center', gap: 12, marginTop: 36 },
   trial: { color: 'var(--gray-text)', fontSize: '0.84rem', marginTop: 14, textAlign: 'right' },
   hint: { color: 'var(--gray-light)', fontSize: '0.78rem', marginTop: 14 },
+  areaGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(108px, 1fr))', gap: 10 },
+  areaCard: { position: 'relative', height: 92, borderRadius: 14, overflow: 'hidden', border: 'none', cursor: 'pointer', padding: 0, background: '#000' },
+  areaImg: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' },
+  areaShade: { position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.75), rgba(0,0,0,0.15))' },
+  areaLabel: { position: 'absolute', left: 10, bottom: 9, right: 8, display: 'flex', alignItems: 'center', gap: 6,
+    color: '#fff', fontWeight: 700, fontSize: '0.8rem', textAlign: 'left', lineHeight: 1.15 },
+  recEyebrow: { fontSize: '0.7rem', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gray-light)' },
+  recCard: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: '100%',
+    textAlign: 'left', padding: '14px 16px', borderRadius: 14, border: '1.5px solid var(--gray-line)',
+    background: 'var(--white)', color: 'var(--ink)', fontWeight: 600, fontSize: '0.95rem', cursor: 'pointer' },
+  recOwn: { display: 'inline-flex', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginTop: 2,
+    padding: '10px 4px', background: 'none', border: 'none', color: 'var(--blue)', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer' },
 }
