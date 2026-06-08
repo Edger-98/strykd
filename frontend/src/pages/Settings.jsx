@@ -210,9 +210,20 @@ function SubscriptionSection({ sub, trial }) {
     catch (e) { setErr(e.message) }
     finally { setBusy('') }
   }
+  const [refunded, setRefunded] = useState(false)
+  const refund = async () => {
+    if (!window.confirm(
+      'Request a full refund?\n\nWe refund your most recent payment and cancel your subscription immediately. '
+      + 'You lose access right away. Refunds are only available within 7 days of subscribing.'
+    )) return
+    setBusy('refund'); setErr('')
+    try { await api.requestRefund(); setRefunded(true); setCancelled(true) }
+    catch (e) { setErr(e.message) }
+    finally { setBusy('') }
+  }
 
-  const active = sub?.active
-  const status = cancelled ? 'cancelled' : (sub?.status || (active ? 'active' : null))
+  const active = sub?.active && !refunded
+  const status = refunded ? 'refunded' : cancelled ? 'cancelled' : (sub?.status || (sub?.active ? 'active' : null))
   const nextBilling = sub?.next_billing_date ? new Date(sub.next_billing_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : null
 
   return (
@@ -241,7 +252,8 @@ function SubscriptionSection({ sub, trial }) {
             <span style={{ fontWeight: 600 }}>{nextBilling}</span>
           </div>
         )}
-        {cancelled && <p style={{ color: 'var(--d-text-dim)', fontSize: '0.9rem', marginTop: 12 }}>Your subscription will end at the close of the current period.</p>}
+        {refunded && <p style={{ color: 'var(--d-text-dim)', fontSize: '0.9rem', marginTop: 12 }}>Your last payment was refunded and your subscription was cancelled.</p>}
+        {cancelled && !refunded && <p style={{ color: 'var(--d-text-dim)', fontSize: '0.9rem', marginTop: 12 }}>Your subscription will end at the close of the current period.</p>}
 
         {err && <p style={S.err}>{err}</p>}
         <div style={{ ...S.actionRow, marginTop: 20 }}>
@@ -253,6 +265,11 @@ function SubscriptionSection({ sub, trial }) {
               {!cancelled && (
                 <button onClick={cancel} disabled={!!busy} style={S.dangerLink}>
                   {busy === 'cancel' ? <Loader2 size={15} className="spin-icon" /> : 'Cancel subscription'}
+                </button>
+              )}
+              {sub?.refund_eligible && !refunded && (
+                <button onClick={refund} disabled={!!busy} style={S.dangerLink}>
+                  {busy === 'refund' ? <Loader2 size={15} className="spin-icon" /> : 'Request refund'}
                 </button>
               )}
             </>

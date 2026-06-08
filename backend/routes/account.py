@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import delete, select
@@ -48,12 +50,16 @@ def _user_dict(u: User) -> dict:
 @router.get("/me")
 async def get_me(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     billing = await db.scalar(select(Billing).where(Billing.user_id == current_user.id))
+    refund_eligible = False
+    if current_user.subscription_active and billing and billing.started_at:
+        refund_eligible = (datetime.now(timezone.utc) - billing.started_at) <= timedelta(days=7)
     return {
         "user": _user_dict(current_user),
         "subscription": {
             "active": current_user.subscription_active,
             "status": billing.status if billing else None,
             "next_billing_date": billing.next_billing_date.isoformat() if billing and billing.next_billing_date else None,
+            "refund_eligible": refund_eligible,
         },
         "trial": trial_status(current_user),
     }

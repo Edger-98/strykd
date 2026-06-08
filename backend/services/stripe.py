@@ -53,6 +53,22 @@ async def cancel_subscription(subscription_id: str):
     return await stripe.Subscription.modify_async(subscription_id, cancel_at_period_end=True)
 
 
+async def cancel_subscription_now(subscription_id: str):
+    """Cancel immediately (used with a refund)."""
+    return await stripe.Subscription.cancel_async(subscription_id)
+
+
+async def refund_last_payment(customer_id: str):
+    """Refund the customer's most recent charge in full. Returns the Refund or None."""
+    charges = await stripe.Charge.list_async(customer=customer_id, limit=1)
+    data = charges.get("data") if isinstance(charges, dict) else charges.data
+    if not data:
+        return None
+    charge = data[0]
+    charge_id = charge["id"] if isinstance(charge, dict) else charge.id
+    return await stripe.Refund.create_async(charge=charge_id)
+
+
 def construct_event(payload: bytes, sig_header: str):
     """Verify the webhook signature and return the parsed Stripe event.
 

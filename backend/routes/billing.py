@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import stripe
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -75,6 +75,35 @@ async def cancel(
     return {"message": "Subscription will end at the close of the current period"}
 
 
+REFUND_WINDOW_DAYS = 7
+
+
+@router.post("/refund")
+async def refund(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Cancel immediately and refund the last payment, within the 7-day window."""
+    billing = await db.scalar(select(Billing).where(Billing.user_id == current_user.id))
+    if not billing or not billing.stripe_subscription_id or not billing.stripe_customer_id:
+        raise HTTPException(status_code=400, detail="No active subscription")
+
+    started = billing.started_at
+    if started is None or (datetime.now(timezone.utc) - started) > timedelta(days=REFUND_WINDOW_DAYS):
+        raise HTTPException(status_code=400, detail="Refunds are only available within 7 days of subscribing.")
+
+    try:
+        await stripe_service.refund_last_payment(billing.stripe_customer_id)
+        await stripe_service.cancel_subscription_now(billing.stripe_subscription_id)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Refund failed: {exc}")
+
+    billing.status = "refunded"
+    current_user.subscription_active = False
+    await db.commit()
+    return {"message": "Your payment has been refunded and your subscription cancelled."}
+
+
 async def _upsert_billing(db: AsyncSession, user_id, **fields) -> Billing:
     billing = await db.scalar(select(Billing).where(Billing.user_id == user_id))
     if billing is None:
@@ -139,6 +168,7 @@ async def stripe_webhook(
         user = await _user_from_event_object(db, obj)
         if user:
             next_billing = obj.get("current_period_end")
+            started = obj.get("start_date") or obj.get("created")
             await _upsert_billing(
                 db,
                 user.id,
@@ -147,6 +177,7 @@ async def stripe_webhook(
                 status="active",
                 next_billing_date=datetime.fromtimestamp(next_billing, tz=timezone.utc)
                 if next_billing else None,
+                started_at=datetime.fromtimestamp(started, tz=timezone.utc) if started else datetime.now(timezone.utc),
             )
             user.subscription_active = True
             await db.commit()

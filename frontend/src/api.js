@@ -124,6 +124,7 @@ export const api = {
   checkout: () => req('POST', '/billing/checkout'),
   billingPortal: () => req('POST', '/billing/portal'),
   cancelSubscription: () => req('POST', '/billing/cancel'),
+  requestRefund: () => req('POST', '/billing/refund'),
 
   replanConfirm: body => req('POST', '/replan/confirm', body),
 
