@@ -3,17 +3,9 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Check, ArrowRight } from 'lucide-react'
 import { api } from '../api'
 
-// Stage keys in order + their copy (the frontend knows these so it can show the
-// CURRENT stage as in-progress before its completion event arrives).
-const STAGES = ['analyzing', 'chapters', 'tasks', 'mission', 'theme', 'signal']
-const LABELS = {
-  analyzing: "Analyzing your goal and what's blocked you before...",
-  chapters: 'Building your chapter map...',
-  tasks: 'Writing your personalized daily tasks...',
-  mission: 'Crafting your mission statement...',
-  theme: 'Creating your visual identity...',
-  signal: 'Writing your Day 1 signal wall entry...',
-}
+// Generation runs in parallel now, so events arrive in whatever order they finish.
+// We just count them toward the total and reflect activity with a live indicator.
+const STAGES = ['chapters', 'tasks', 'mission', 'theme', 'signal']
 const TOTAL = STAGES.length
 
 const fmt = secs => {
@@ -99,7 +91,6 @@ export default function OnboardingStream({ form, onDone, onCancel }) {
 
   const completed = lines.length
   const running = !ready && !error && completed < TOTAL
-  const currentKey = running ? STAGES[completed] : null
   const elapsedNow = startRef.current ? (Date.now() - startRef.current) / 1000 : 0
 
   // Bar: each done stage fills 1/TOTAL; the running stage creeps toward its
@@ -130,13 +121,15 @@ export default function OnboardingStream({ form, onDone, onCancel }) {
             ))}
           </AnimatePresence>
 
-          {/* Current stage, in progress */}
-          {currentKey && (
-            <motion.div key={currentKey} style={S.line}
+          {/* Work in progress (several stages run at once) */}
+          {running && (
+            <motion.div key="active" style={S.line}
               initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
               <Dots />
               <span style={S.ts}>{fmt(elapsedNow)}</span>
-              <span style={{ ...S.msg, color: 'var(--d-text-dim)' }}>{LABELS[currentKey]}</span>
+              <span style={{ ...S.msg, color: 'var(--d-text-dim)' }}>
+                {completed === 0 ? 'Designing your plan in parallel...' : 'Finishing the rest...'}
+              </span>
             </motion.div>
           )}
 

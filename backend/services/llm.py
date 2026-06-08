@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import json
 
@@ -229,6 +230,53 @@ def _fallback_day1(analysis: dict) -> list:
     while len(levers) < 5:
         levers.append("Take one concrete step toward your goal today.")
     return [{"day": 1, "tasks": [{"content": l, "voice_style": "direct"} for l in levers]}]
+
+
+def _phase_for(day: int, total: int) -> str:
+    if day <= 3:
+        return "Foundation: establish baselines, create systems, remove friction."
+    if day <= 10:
+        return "Momentum: build the core habit, increase intensity."
+    if day <= 20:
+        return "Depth: go deeper, attack the named blockers, push the comfort zone."
+    return "Mastery: consolidate, reflect, prepare for life after the plan."
+
+
+async def plan_day(ctx: dict, day_number: int, timeout: float = 55.0) -> dict:
+    """Generate a single day's 5 tasks. Small + fast so many days run concurrently."""
+    total = ctx["duration_days"]
+    system = (
+        f"{_COACH_IDENTITY}\n\n{_TASK_RULES}\n\n"
+        'Return ONLY JSON: {"tasks": [{"content": "task with its one-sentence \'why this today\'", '
+        '"voice_style": "direct|motivational|reflective"}]} with exactly 5 tasks. No preamble.'
+    )
+    user = (
+        f"=== CONTEXT ===\n{_ctx_block(ctx)}\n\n"
+        f"=== DAY ===\nGenerate day {day_number} of {total}. Phase: {_phase_for(day_number, total)}\n"
+        "- Exactly 5 tasks for THIS day, specific to the goal, blockers, life area, or why.\n"
+        "- Each task has a clear completion condition and ends with a one-sentence 'why this today'.\n"
+        f"- Respect their {ctx['hours_per_day'] if ctx['hours_per_day'] is not None else 'available'} hours/day.\n"
+        "- Return only the JSON object."
+    )
+    data = await _json_call(system, user, 2000, timeout=timeout)
+    return {"day": day_number, "tasks": (data.get("tasks") or [])[:5]}
+
+
+async def plan_task_range(ctx: dict, start_day: int, end_day: int) -> list:
+    """Generate days start..end concurrently (one call per day). Returns daily_tasks
+    entries; any day that fails gets a minimal placeholder so nothing is missing."""
+    days = list(range(start_day, end_day + 1))
+    results = await asyncio.gather(*[plan_day(ctx, d) for d in days], return_exceptions=True)
+    out: list[dict] = []
+    for d, r in zip(days, results):
+        if isinstance(r, Exception) or not isinstance(r, dict) or not r.get("tasks"):
+            out.append({"day": d, "tasks": [
+                {"content": f"Take one concrete, specific step toward your goal today (day {d}).",
+                 "voice_style": "direct"}
+            ]})
+        else:
+            out.append(r)
+    return _strip_dashes_deep(out)
 
 
 async def plan_tasks(ctx: dict, analysis: dict, chapters: list) -> list:

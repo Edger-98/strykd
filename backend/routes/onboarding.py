@@ -1,4 +1,6 @@
+import asyncio
 import json
+import logging
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -15,10 +17,18 @@ from models.signal_wall import SignalWall
 from models.task import DailyTask
 from models.theme import Theme
 from models.user import User
+from services.cache import bust_public_page
 from services.llm import (
-    assemble_plan, clarify_goal, day1_contents, generate_plan, plan_analysis,
-    plan_chapters, plan_inputs, plan_mission, plan_signal_day1, plan_tasks, plan_theme,
+    assemble_plan, clarify_goal, day1_contents, generate_plan, plan_chapters,
+    plan_inputs, plan_mission, plan_signal_day1, plan_task_range, plan_theme,
 )
+
+logger = logging.getLogger("strykd.onboarding")
+
+# Days generated up front in the request; the rest fill in via a background task.
+SEED_DAYS = 7
+# Keep references to background tasks so they are not garbage collected mid-run.
+_BG_TASKS: set = set()
 
 router = APIRouter(prefix="/onboarding", tags=["onboarding"])
 
@@ -64,7 +74,7 @@ class OnboardingResponse(BaseModel):
     message: str
 
 
-async def _persist_plan(db: AsyncSession, user: User, body: OnboardingRequest, plan: dict) -> None:
+async def _persist_plan(db: AsyncSession, user: User, body: OnboardingRequest, plan: dict) -> Goal:
     """Persist a generated plan: goal, daily tasks, theme (first goal), Day 1 signal."""
     today = date.today()
     end_date = today + timedelta(days=body.duration_days - 1)
@@ -131,6 +141,8 @@ async def _persist_plan(db: AsyncSession, user: User, body: OnboardingRequest, p
     ))
 
     await db.commit()
+    await db.refresh(goal)
+    return goal
 
 
 @router.post("", response_model=OnboardingResponse)
@@ -169,13 +181,43 @@ async def onboard(
 
 # Progress copy for each streamed stage (fired as that stage completes)
 _STAGE_MESSAGES = {
-    "analyzing": "Analyzing your goal and what's blocked you before...",
     "chapters": "Building your chapter map...",
     "tasks": "Writing your personalized daily tasks...",
     "mission": "Crafting your mission statement...",
     "theme": "Creating your visual identity...",
     "signal": "Writing your Day 1 signal wall entry...",
 }
+
+
+async def _generate_remaining_days(goal_id, ctx: dict, start_day: int, end_day: int, base_date: date, slug: str):
+    """Background fill of day start..end after the user already has their plan.
+    Generated in concurrent chunks; skips any day the nightly cron already wrote."""
+    try:
+        async with AsyncSessionLocal() as db:
+            goal = await db.scalar(select(Goal).where(Goal.id == goal_id))
+            if goal is None:
+                return
+            d = start_day
+            while d <= end_day:
+                chunk_end = min(d + SEED_DAYS - 1, end_day)
+                entries = await plan_task_range(ctx, d, chunk_end)
+                for entry in entries:
+                    td = base_date + timedelta(days=int(entry["day"]) - 1)
+                    exists = await db.scalar(
+                        select(DailyTask).where(DailyTask.goal_id == goal_id, DailyTask.task_date == td)
+                    )
+                    if exists:
+                        continue
+                    for t in entry.get("tasks", []):
+                        db.add(DailyTask(
+                            goal_id=goal_id, user_id=goal.user_id, task_date=td,
+                            content=t["content"], voice_style=t.get("voice_style", "direct"),
+                        ))
+                await db.commit()
+                d = chunk_end + 1
+        await bust_public_page(slug)
+    except Exception as exc:  # background, never surfaces to the user
+        logger.error("Background day generation failed for goal %s: %s", goal_id, exc)
 
 
 @router.get("/stream")
@@ -207,40 +249,49 @@ async def onboard_stream(
         def sse(obj) -> str:
             return f"data: {json.dumps(obj)}\n\n"
 
-        def stage(name) -> str:
-            return sse({"event": name, "message": _STAGE_MESSAGES[name]})
-
         try:
             ctx = plan_inputs(
                 goals=goals, duration_days=duration_days, aesthetic=aesthetic, life_area=life_area,
                 why_now=why_now, past_blockers=past_blockers, hours_per_day=hours_per_day,
                 daily_rhythm=daily_rhythm,
             )
+            seed_end = min(duration_days, SEED_DAYS)
 
-            analysis = await plan_analysis(ctx)
-            yield stage("analyzing")
+            # Theme, chapters, mission, and the first week of tasks all run at once;
+            # each emits its event the moment it finishes (order is whoever wins).
+            async def labeled(name, coro):
+                return name, await coro
 
-            chapters = await plan_chapters(ctx, analysis)
-            yield stage("chapters")
+            pending = {
+                asyncio.ensure_future(labeled("theme", plan_theme(ctx))),
+                asyncio.ensure_future(labeled("chapters", plan_chapters(ctx, {}))),
+                asyncio.ensure_future(labeled("mission", plan_mission(ctx, {}))),
+                asyncio.ensure_future(labeled("tasks", plan_task_range(ctx, 1, seed_end))),
+            }
+            results = {}
+            for fut in asyncio.as_completed(pending):
+                name, value = await fut
+                results[name] = value
+                yield sse({"event": name, "message": _STAGE_MESSAGES[name]})
 
-            tasks = await plan_tasks(ctx, analysis, chapters)
-            yield stage("tasks")
+            # Day 1 signal needs the first day's tasks, so it runs last (quick).
+            signal = await plan_signal_day1(ctx, day1_contents(results["tasks"]))
+            yield sse({"event": "signal", "message": _STAGE_MESSAGES["signal"]})
 
-            mission = await plan_mission(ctx, analysis)
-            yield stage("mission")
+            plan = assemble_plan(results["theme"], results["mission"], results["chapters"], signal, results["tasks"])
 
-            theme = await plan_theme(ctx)
-            yield stage("theme")
-
-            signal = await plan_signal_day1(ctx, day1_contents(tasks))
-            yield stage("signal")
-
-            plan = assemble_plan(theme, mission, chapters, signal, tasks)
-
-            # Persist in a fresh session (request-scoped deps may be torn down mid-stream)
             async with AsyncSessionLocal() as db:
                 user = await db.scalar(select(User).where(User.id == user_id))
-                await _persist_plan(db, user, body, plan)
+                goal = await _persist_plan(db, user, body, plan)
+                goal_id = goal.id
+
+            # Remaining days generate in the background; user is already done.
+            if duration_days > seed_end:
+                t = asyncio.ensure_future(
+                    _generate_remaining_days(goal_id, ctx, seed_end + 1, duration_days, date.today(), slug)
+                )
+                _BG_TASKS.add(t)
+                t.add_done_callback(_BG_TASKS.discard)
 
             resp = {
                 "slug": slug,
