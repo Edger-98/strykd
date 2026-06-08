@@ -3,7 +3,17 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Check, ArrowRight } from 'lucide-react'
 import { api } from '../api'
 
+// Stage keys in order + their copy (the frontend knows these so it can show the
+// CURRENT stage as in-progress before its completion event arrives).
 const STAGES = ['analyzing', 'chapters', 'tasks', 'mission', 'theme', 'signal']
+const LABELS = {
+  analyzing: "Analyzing your goal and what's blocked you before...",
+  chapters: 'Building your chapter map...',
+  tasks: 'Writing your personalized daily tasks...',
+  mission: 'Crafting your mission statement...',
+  theme: 'Creating your visual identity...',
+  signal: 'Writing your Day 1 signal wall entry...',
+}
 const TOTAL = STAGES.length
 
 const fmt = secs => {
@@ -14,14 +24,15 @@ const fmt = secs => {
 
 /**
  * Full-screen cinematic loading experience for plan generation. Streams the
- * onboarding SSE endpoint and reveals one progress line per completed stage,
- * a thin red bar filling 1/6 per stage, then "Your plan is ready." and redirect.
+ * onboarding SSE endpoint: completed stages get a checked line, the running stage
+ * shows its label with a live indicator + timer (so the long task-writing stage
+ * never looks frozen), a thin red bar creeps forward, then "Your plan is ready."
  */
 export default function OnboardingStream({ form, onDone, onCancel }) {
-  const [lines, setLines] = useState([])   // { event, message, t }
-  const [completed, setCompleted] = useState(0)
+  const [lines, setLines] = useState([])   // completed: { event, message, t }
   const [ready, setReady] = useState(false)
   const [error, setError] = useState('')
+  const [, setTick] = useState(0)          // drives the live timer re-render
   const startRef = useRef(0)
   const abortRef = useRef(null)
   const runningRef = useRef(false)
@@ -29,7 +40,7 @@ export default function OnboardingStream({ form, onDone, onCancel }) {
   const run = async () => {
     if (runningRef.current) return
     runningRef.current = true
-    setLines([]); setCompleted(0); setReady(false); setError('')
+    setLines([]); setReady(false); setError('')
     startRef.current = Date.now()
     const controller = new AbortController()
     abortRef.current = controller
@@ -54,17 +65,14 @@ export default function OnboardingStream({ form, onDone, onCancel }) {
             let ev
             try { ev = JSON.parse(ln.slice(6)) } catch { continue }
             const t = (Date.now() - startRef.current) / 1000
-
             if (ev.event === 'error') { setError(ev.message || 'Generation failed'); return }
             if (ev.event === 'done') {
-              setCompleted(TOTAL)
               setReady(true)
               setTimeout(() => onDone(ev.data), 1900)
               return
             }
             if (STAGES.includes(ev.event)) {
-              setLines(prev => [...prev, { event: ev.event, message: ev.message, t }])
-              setCompleted(prev => Math.min(prev + 1, TOTAL))
+              setLines(prev => [...prev, { event: ev.event, message: ev.message || LABELS[ev.event], t }])
             }
           }
         }
@@ -82,13 +90,27 @@ export default function OnboardingStream({ form, onDone, onCancel }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const pct = ready ? 100 : (completed / TOTAL) * 100
+  // Tick the live timer once a second while a stage is running
+  useEffect(() => {
+    if (ready || error) return
+    const id = setInterval(() => setTick(n => n + 1), 1000)
+    return () => clearInterval(id)
+  }, [ready, error])
+
+  const completed = lines.length
+  const running = !ready && !error && completed < TOTAL
+  const currentKey = running ? STAGES[completed] : null
+  const elapsedNow = startRef.current ? (Date.now() - startRef.current) / 1000 : 0
+
+  // Bar: each done stage fills 1/TOTAL; the running stage creeps toward its
+  // segment top so the long stage keeps visibly moving.
+  const target = ready ? 100 : ((completed + (running ? 0.9 : 0)) / TOTAL) * 100
+  const barDur = running ? 28 : 0.6
 
   return (
     <div style={S.shell}>
-      {/* thin red progress bar */}
       <div style={S.track}>
-        <motion.div style={S.fill} animate={{ width: `${pct}%` }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }} />
+        <motion.div style={S.fill} animate={{ width: `${target}%` }} transition={{ duration: barDur, ease: 'linear' }} />
       </div>
 
       <div style={S.inner}>
@@ -108,17 +130,21 @@ export default function OnboardingStream({ form, onDone, onCancel }) {
             ))}
           </AnimatePresence>
 
+          {/* Current stage, in progress */}
+          {currentKey && (
+            <motion.div key={currentKey} style={S.line}
+              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+              <Dots />
+              <span style={S.ts}>{fmt(elapsedNow)}</span>
+              <span style={{ ...S.msg, color: 'var(--d-text-dim)' }}>{LABELS[currentKey]}</span>
+            </motion.div>
+          )}
+
           {ready && (
             <motion.h2 style={S.ready} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}>
               Your plan is ready.
             </motion.h2>
-          )}
-
-          {!ready && !error && (
-            <div style={S.caretRow}>
-              <span style={S.caret} />
-            </div>
           )}
 
           {error && (
@@ -133,6 +159,18 @@ export default function OnboardingStream({ form, onDone, onCancel }) {
         </div>
       </div>
     </div>
+  )
+}
+
+function Dots() {
+  return (
+    <span style={{ display: 'inline-flex', gap: 4, flexShrink: 0, marginTop: 7, width: 15, justifyContent: 'center' }}>
+      {[0, 1, 2].map(i => (
+        <motion.span key={i} style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--red)' }}
+          animate={{ opacity: [0.3, 1, 0.3], y: [0, -3, 0] }}
+          transition={{ duration: 1.1, repeat: Infinity, delay: i * 0.18, ease: 'easeInOut' }} />
+      ))}
+    </span>
   )
 }
 
@@ -151,9 +189,6 @@ const S = {
   msg: { fontSize: '1.05rem', lineHeight: 1.5, color: '#fff' },
   ready: { fontSize: 'clamp(1.7rem, 4.5vw, 2.6rem)', fontWeight: 800, letterSpacing: '-0.02em',
     marginTop: 28, color: '#fff', textShadow: '0 0 30px rgba(255,45,45,0.35)' },
-  caretRow: { display: 'flex', alignItems: 'center', gap: 14, paddingLeft: 1 },
-  caret: { width: 9, height: 18, background: 'var(--red)', display: 'inline-block',
-    animation: 'blink 1.1s step-end infinite', borderRadius: 1 },
   errBox: { marginTop: 12 },
   cancel: { color: '#fff', borderColor: 'rgba(255,255,255,0.3)' },
 }
