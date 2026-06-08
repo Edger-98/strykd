@@ -274,6 +274,10 @@ async def get_dashboard(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # Record activity for the inactivity-nudge reminder
+    current_user.last_active_at = datetime.now(timezone.utc)
+    await db.commit()
+
     data = await _build_payload(current_user, db, detailed=True, include_paused=True)
 
     data["user"]["id"] = str(current_user.id)

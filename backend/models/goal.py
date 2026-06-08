@@ -30,6 +30,7 @@ class Goal(Base):
     # Per-goal streak (each goal tracks its own daily check-in streak)
     streak_days: Mapped[int] = mapped_column(Integer, default=0)
     last_checkin: Mapped[date | None] = mapped_column(Date, nullable=True)
+    deadline_email_sent: Mapped[bool] = mapped_column(Boolean, default=False)  # 3-days-before email dedupe
 
     # Per-goal narrative (each goal has its own chapter timeline + projected outcome)
     chapter_titles: Mapped[list | None] = mapped_column(JSONB, nullable=True)

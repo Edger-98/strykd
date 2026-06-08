@@ -120,6 +120,32 @@ async def send_trial_ending_email(to: str, name: str) -> None:
     await _send_async(to, "Your Strykd free week ends tomorrow", _shell(body))
 
 
+async def send_inactivity_nudge_email(to: str, name: str) -> None:
+    first = (name or "there").split(" ")[0]
+    body = (
+        f'<h1 style="font-size:28px;font-weight:800;margin:16px 0;">'
+        f'Your goals are waiting, {first}.</h1>'
+        '<p style="color:#A1A1A1;font-size:16px;line-height:1.6;">'
+        "You haven't checked in today. It only takes a minute to keep your momentum going. "
+        "Open your dashboard and knock out one task.</p>"
+        + _button(f"{settings.frontend_url}/dashboard", "Open my dashboard")
+    )
+    await _send_async(to, "Your goals are waiting", _shell(body))
+
+
+async def send_deadline_email(to: str, name: str, goal: str, day: int, total_days: int) -> None:
+    first = (name or "there").split(" ")[0]
+    body = (
+        f'<h1 style="font-size:28px;font-weight:800;margin:16px 0;">'
+        f'Your goal ends in 3 days, {first}.</h1>'
+        '<p style="color:#A1A1A1;font-size:16px;line-height:1.6;">'
+        f'"{goal}" wraps up in 3 days. You\'re on day {day} of {total_days}. '
+        "Make these last days count.</p>"
+        + _button(f"{settings.frontend_url}/dashboard", "Finish strong")
+    )
+    await _send_async(to, "Your goal ends in 3 days", _shell(body))
+
+
 async def send_subscription_confirmation_email(to: str, name: str) -> None:
     first = (name or "there").split(" ")[0]
     body = (

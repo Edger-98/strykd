@@ -27,6 +27,8 @@ class User(Base):
     timezone: Mapped[str] = mapped_column(String, default="UTC")
     last_reminder_sent: Mapped[date | None] = mapped_column(Date, nullable=True)  # streak reminder dedupe
     trial_ending_sent: Mapped[bool] = mapped_column(Boolean, default=False)  # day-6 trial email dedupe
+    last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # last dashboard open
+    last_nudge_sent: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # inactivity nudge dedupe
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     goals: Mapped[list["Goal"]] = relationship("Goal", back_populates="user", cascade="all, delete-orphan")

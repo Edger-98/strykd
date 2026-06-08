@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -12,7 +12,10 @@ from models.signal_wall import SignalWall
 from models.task import DailyTask
 from models.user import User
 from services.cache import bust_public_page
-from services.email import send_streak_reminder_email, send_trial_ending_email
+from services.email import (
+    send_deadline_email, send_inactivity_nudge_email, send_streak_reminder_email,
+    send_trial_ending_email,
+)
 from services.llm import generate_nightly
 from trial import trial_status
 
@@ -96,7 +99,22 @@ async def nightly(
         if user:
             await bust_public_page(user.slug)
 
-    return {"goals_processed": processed, "errors": errors}
+    # Goal-deadline emails: 3 days before end_date, once per goal.
+    deadline_emails = 0
+    dl_res = await db.execute(
+        select(Goal).where(Goal.status == "active", Goal.deadline_email_sent.is_(False))
+    )
+    for goal in dl_res.scalars().all():
+        if (goal.end_date - today).days == 3:
+            user = await db.scalar(select(User).where(User.id == goal.user_id))
+            if user and user.email_reminders:
+                day = min(max((today - goal.start_date).days + 1, 1), goal.duration_days)
+                await send_deadline_email(user.email, user.name, goal.description, day, goal.duration_days)
+            goal.deadline_email_sent = True
+            deadline_emails += 1
+    await db.commit()
+
+    return {"goals_processed": processed, "errors": errors, "deadline_emails": deadline_emails}
 
 
 @router.post("/streak-reminders")
@@ -125,6 +143,32 @@ async def streak_reminders(
             await send_trial_ending_email(u.email, u.name)
             u.trial_ending_sent = True
             trial_emails += 1
+    await db.commit()
+
+    # Inactivity nudge: no dashboard open in 6h during active hours (8am-10pm local),
+    # at most one nudge per 6h, only for users who actually have an active goal.
+    now_utc = datetime.now(timezone.utc)
+    nudges = 0
+    nud_res = await db.execute(select(User).where(User.email_reminders.is_(True)))
+    for u in nud_res.scalars().all():
+        try:
+            tz = ZoneInfo(u.timezone or "UTC")
+        except (ZoneInfoNotFoundError, ValueError):
+            tz = ZoneInfo("UTC")
+        if not (8 <= now_utc.astimezone(tz).hour < 22):
+            continue
+        has_goal = await db.scalar(
+            select(func.count()).select_from(Goal).where(Goal.user_id == u.id, Goal.status == "active")
+        ) or 0
+        if not has_goal:
+            continue
+        inactive = u.last_active_at is None or (now_utc - u.last_active_at) >= timedelta(hours=6)
+        recently_nudged = u.last_nudge_sent is not None and (now_utc - u.last_nudge_sent) < timedelta(hours=6)
+        if not inactive or recently_nudged:
+            continue
+        await send_inactivity_nudge_email(u.email, u.name)
+        u.last_nudge_sent = now_utc
+        nudges += 1
     await db.commit()
 
     users_res = await db.execute(select(User).where(User.email_reminders.is_(True)))
@@ -171,4 +215,4 @@ async def streak_reminders(
         sent += 1
 
     await db.commit()
-    return {"reminders_sent": sent, "trial_ending_emails": trial_emails}
+    return {"reminders_sent": sent, "trial_ending_emails": trial_emails, "inactivity_nudges": nudges}
