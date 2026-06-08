@@ -35,15 +35,29 @@ async def _send_async(to: str, subject: str, html: str) -> None:
     await asyncio.to_thread(_send, to, subject, html)
 
 
+def _button(href: str, label: str) -> str:
+    return (
+        f'<table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0;"><tr><td '
+        'style="border-radius:50px;background:#FF2D2D;">'
+        f'<a href="{href}" style="display:inline-block;padding:14px 32px;color:#fff;text-decoration:none;'
+        f'font-weight:700;font-size:15px;border-radius:50px;">{label}</a></td></tr></table>'
+    )
+
+
 def _shell(body: str) -> str:
     return (
-        '<div style="background:#000;color:#fff;font-family:-apple-system,'
-        'BlinkMacSystemFont,Segoe UI,sans-serif;padding:40px 24px;">'
-        '<div style="max-width:480px;margin:0 auto;">'
-        '<p style="letter-spacing:.18em;font-weight:800;font-size:14px;color:#A1A1A1;">STRYKD</p>'
-        f'{body}'
-        '<p style="color:#5C5C5C;font-size:12px;margin-top:40px;">'
-        'Strykd — AI accountability that ships.</p>'
+        '<div style="background:#000;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,sans-serif;'
+        'padding:32px 16px;margin:0;">'
+        '<div style="max-width:480px;margin:0 auto;background:#0A0A0A;border:1px solid #1F1F1F;'
+        'border-radius:20px;overflow:hidden;">'
+        '<div style="padding:28px 32px 0;text-align:center;">'
+        '<span style="letter-spacing:.24em;font-weight:800;font-size:16px;color:#fff;">STRYKD</span>'
+        '<div style="height:3px;width:40px;background:#FF2D2D;margin:14px auto 0;border-radius:2px;"></div>'
+        '</div>'
+        f'<div style="padding:24px 32px 32px;color:#fff;">{body}</div>'
+        '<div style="padding:18px 32px;border-top:1px solid #1F1F1F;">'
+        '<p style="color:#5C5C5C;font-size:12px;line-height:1.5;margin:0;">'
+        'Strykd. AI accountability that ships.</p></div>'
         '</div></div>'
     )
 
@@ -58,6 +72,7 @@ async def send_welcome_email(to: str, name: str) -> None:
         "your own subdomain.</p>"
         '<p style="color:#A1A1A1;font-size:16px;line-height:1.6;margin-top:16px;">'
         "Show up. Check off. Don't break the streak.</p>"
+        + _button(f"{settings.frontend_url}/onboard", "Build my plan")
     )
     await _send_async(to, "Welcome to Strykd", _shell(body))
 
@@ -70,10 +85,8 @@ async def send_password_reset_email(to: str, name: str, reset_url: str) -> None:
         '<p style="color:#A1A1A1;font-size:16px;line-height:1.6;">'
         "We received a request to reset your Strykd password. This link is valid "
         "for one hour. If you didn't ask for this, you can safely ignore this email.</p>"
-        f'<p style="margin:28px 0;"><a href="{reset_url}" '
-        'style="background:#FF2D2D;color:#fff;text-decoration:none;font-weight:700;'
-        'padding:14px 28px;border-radius:50px;display:inline-block;">Reset password</a></p>'
-        '<p style="color:#5C5C5C;font-size:13px;line-height:1.6;">'
+        + _button(reset_url, "Reset password")
+        + '<p style="color:#5C5C5C;font-size:13px;line-height:1.6;">'
         f'Or paste this link into your browser:<br>{reset_url}</p>'
     )
     await _send_async(to, "Reset your Strykd password", _shell(body))
@@ -89,9 +102,7 @@ async def send_streak_reminder_email(to: str, name: str, streak_days: int) -> No
         f'Your streak is at risk, {first}.</h1>'
         '<p style="color:#A1A1A1;font-size:16px;line-height:1.6;">'
         f"{streak_line}Log in and check off at least one task to keep it alive.</p>"
-        f'<p style="margin:28px 0;"><a href="{settings.frontend_url}/dashboard" '
-        'style="background:#FF2D2D;color:#fff;text-decoration:none;font-weight:700;'
-        'padding:14px 28px;border-radius:50px;display:inline-block;">Open Strykd</a></p>'
+        + _button(f"{settings.frontend_url}/dashboard", "Keep my streak alive")
     )
     await _send_async(to, "Your streak is at risk", _shell(body))
 
@@ -102,10 +113,21 @@ async def send_trial_ending_email(to: str, name: str) -> None:
         f'<h1 style="font-size:28px;font-weight:800;margin:16px 0;">'
         f'Your free week is almost up, {first}.</h1>'
         '<p style="color:#A1A1A1;font-size:16px;line-height:1.6;">'
-        "In 3 days your free trial ends and your $9/month subscription begins. "
-        "No action needed if you want to keep your momentum going.</p>"
-        '<p style="color:#A1A1A1;font-size:16px;line-height:1.6;margin-top:16px;">'
-        "Want to pause? You can cancel anytime from your billing settings before "
-        "the trial ends and you won't be charged.</p>"
+        "Tomorrow your 7-day free trial ends. Keep your plan, your AI coach, and your "
+        "streak going for $9/month, or cancel anytime before then and you won't be charged.</p>"
+        + _button(f"{settings.frontend_url}/dashboard/settings", "Manage my subscription")
     )
-    await _send_async(to, "Your Strykd trial ends in 3 days", _shell(body))
+    await _send_async(to, "Your Strykd free week ends tomorrow", _shell(body))
+
+
+async def send_subscription_confirmation_email(to: str, name: str) -> None:
+    first = (name or "there").split(" ")[0]
+    body = (
+        f'<h1 style="font-size:28px;font-weight:800;margin:16px 0;">'
+        f"You're in, {first}.</h1>"
+        '<p style="color:#A1A1A1;font-size:16px;line-height:1.6;">'
+        "Your Strykd subscription is active. You backed yourself, now keep showing up. "
+        "Your plan, your AI coach, and your public page are all live.</p>"
+        + _button(f"{settings.frontend_url}/dashboard", "Open my dashboard")
+    )
+    await _send_async(to, "Your Strykd subscription is active", _shell(body))

@@ -12,8 +12,9 @@ from models.signal_wall import SignalWall
 from models.task import DailyTask
 from models.user import User
 from services.cache import bust_public_page
-from services.email import send_streak_reminder_email
+from services.email import send_streak_reminder_email, send_trial_ending_email
 from services.llm import generate_nightly
+from trial import trial_status
 
 router = APIRouter(prefix="/cron", tags=["cron"])
 
@@ -109,6 +110,23 @@ async def streak_reminders(
     if x_cron_secret != settings.cron_secret:
         raise HTTPException(status_code=403, detail="Forbidden")
 
+    # Trial-ending email on day 6 (the day before the free week ends), deduped.
+    trial_emails = 0
+    te_res = await db.execute(
+        select(User).where(
+            User.subscription_active.is_(False),
+            User.trial_ending_sent.is_(False),
+            User.trial_start_date.isnot(None),
+        )
+    )
+    for u in te_res.scalars().all():
+        ts = trial_status(u)
+        if ts.get("day") == 6 and not ts.get("subscription_active"):
+            await send_trial_ending_email(u.email, u.name)
+            u.trial_ending_sent = True
+            trial_emails += 1
+    await db.commit()
+
     users_res = await db.execute(select(User).where(User.email_reminders.is_(True)))
     users = users_res.scalars().all()
 
@@ -153,4 +171,4 @@ async def streak_reminders(
         sent += 1
 
     await db.commit()
-    return {"reminders_sent": sent}
+    return {"reminders_sent": sent, "trial_ending_emails": trial_emails}

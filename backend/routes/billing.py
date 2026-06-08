@@ -10,7 +10,7 @@ from deps import get_current_user
 from models.billing import Billing
 from models.user import User
 from services import stripe as stripe_service
-from services.email import send_trial_ending_email
+from services.email import send_subscription_confirmation_email, send_trial_ending_email
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
@@ -150,6 +150,7 @@ async def stripe_webhook(
             )
             user.subscription_active = True
             await db.commit()
+            await send_subscription_confirmation_email(user.email, user.name)
 
     elif etype == "customer.subscription.deleted":
         user = await _user_from_event_object(db, obj)
