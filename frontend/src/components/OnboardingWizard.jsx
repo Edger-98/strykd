@@ -5,6 +5,7 @@ import {
   Sunrise, Moon, Globe, Lock, X,
 } from 'lucide-react'
 import { stepVariants } from '../motion'
+import GoalChat from './GoalChat'
 
 const STEP_BG = {
   goals: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1440&q=80',
@@ -41,10 +42,9 @@ export default function OnboardingWizard({ onSubmit, busy, error, mode = 'signup
   const addMode = mode === 'add'
 
   const steps = [
-    { key: 'goals', q: 'What do you want to achieve?', sub: 'Be ambitious. The AI builds the path.',
-      valid: () => form.goals.trim().length > 3, text: true,
-      render: () => <textarea autoFocus className="field" style={St.textarea}
-        placeholder="e.g. Launch my freelance studio and land 3 paying clients" value={form.goals} onChange={e => set('goals', e.target.value)} /> },
+    { key: 'goals', q: 'Let us get clear on your goal.', sub: "Tell me what's on your mind and I'll ask a few questions to sharpen it.",
+      valid: () => form.goals.trim().length > 3, chat: true,
+      render: () => <GoalChat lifeArea={form.life_area} initialGoal={form.goals} onApprove={approveGoal} /> },
     { key: 'life_area', q: 'Which part of your life?', sub: 'This shapes the structure of your plan.',
       valid: () => !!form.life_area,
       render: () => (
@@ -143,7 +143,13 @@ export default function OnboardingWizard({ onSubmit, busy, error, mode = 'signup
     setDir(1); setStep(s => s + 1)
   }
   const back = () => { setLocalErr(''); setDir(-1); setStep(s => Math.max(0, s - 1)) }
+  // The goal chat owns its own input + approval; on approval set the refined goal and advance.
+  const approveGoal = refinedGoal => {
+    setForm(f => ({ ...f, goals: refinedGoal }))
+    setLocalErr(''); setDir(1); setStep(s => s + 1)
+  }
   const onKey = e => {
+    if (cur.chat) return  // the chat handles its own keys
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); advance() }
     else if (e.key === 'Enter' && !e.shiftKey && !cur.text) { e.preventDefault(); advance() }
   }
@@ -183,15 +189,23 @@ export default function OnboardingWizard({ onSubmit, busy, error, mode = 'signup
           <AnimatePresence mode="wait" custom={dir}>
             <motion.div key={step} custom={dir} variants={stepVariants} initial="enter" animate="center" exit="exit" style={{ width: '100%' }}>
               <h1 className="h-xl display" style={{ marginBottom: 12 }}>{cur.q}</h1>
-              <p className="lead" style={{ marginBottom: 36 }}>{cur.sub}</p>
+              <p className="lead" style={{ marginBottom: cur.chat ? 20 : 36 }}>{cur.sub}</p>
               {cur.render()}
               {(localErr || error) && <p style={St.err}>{localErr || error}</p>}
-              <div style={St.nav}>
-                {step > 0 && <button className="pill pill-outline pill-sm" onClick={back}><ArrowLeft size={15} /> Back</button>}
-                <button className="pill pill-dark" onClick={() => advance()} style={{ marginLeft: 'auto' }}>
-                  {isLast ? (addMode ? 'Create this goal' : 'Start your free week') : 'Continue'} <ArrowRight size={17} />
-                </button>
-              </div>
+              {!cur.chat && (
+                <div style={St.nav}>
+                  {step > 0 && <button className="pill pill-outline pill-sm" onClick={back}><ArrowLeft size={15} /> Back</button>}
+                  <button className="pill pill-dark" onClick={() => advance()} style={{ marginLeft: 'auto' }}>
+                    {isLast ? (addMode ? 'Create this goal' : 'Start your free week') : 'Continue'} <ArrowRight size={17} />
+                  </button>
+                </div>
+              )}
+              {/* Back link for the chat step (no Continue; the chat's approve button advances) */}
+              {cur.chat && step > 0 && (
+                <div style={{ marginTop: 16 }}>
+                  <button className="pill pill-outline pill-sm" onClick={back}><ArrowLeft size={15} /> Back</button>
+                </div>
+              )}
               {isLast && !addMode && <p style={St.trial}>No charge for 7 days. Cancel anytime.</p>}
               {cur.text && <p style={St.hint}>Press Cmd/Ctrl + Enter to continue</p>}
             </motion.div>

@@ -100,6 +100,55 @@ async def _json_call(system: str, user: str, max_tokens: int, timeout: float = 6
     return _strip_dashes_deep(json.loads(raw))
 
 
+_CLARIFY_SYSTEM = (
+    "You are a world-class goal clarification coach. Your job is to ask focused follow-up "
+    "questions to turn a vague goal into something specific and achievable. Ask one question "
+    "at a time. After 3 to 5 exchanges you have enough to synthesize a refined goal. When ready "
+    'respond with JSON: {"type": "question", "message": "..."} or '
+    '{"type": "refined", "message": "...", "refined_goal": "..."}. '
+    "Never ask more than 5 questions total. Questions should uncover: what specifically they want "
+    "to achieve, who it is for or affects, what success looks like in measurable terms, what has "
+    "stopped them before, what resources or time they have. "
+    "Return ONLY the JSON object, no preamble. Never use em dashes; use commas or periods."
+)
+
+
+async def clarify_goal(conversation: list[dict], life_area: str | None = None) -> dict:
+    """One turn of the goal-clarification chat.
+
+    Returns {"type": "question", "message": str} or
+    {"type": "refined", "message": str, "refined_goal": str}.
+    """
+    asked = sum(1 for m in conversation if m.get("role") in ("ai", "assistant"))
+    answered = sum(1 for m in conversation if m.get("role") == "user")
+    transcript = "\n".join(
+        f"{'COACH' if m.get('role') in ('ai', 'assistant') else 'USER'}: {m.get('content', '')}"
+        for m in conversation
+    )
+    force = answered >= 5 or asked >= 5
+    user = (
+        (f"Life area: {life_area}\n\n" if life_area else "")
+        + "Conversation so far:\n" + (transcript or "(no messages yet)") + "\n\n"
+        + (
+            "You have asked enough questions. You MUST respond with type 'refined' now, "
+            "synthesizing everything into one specific, measurable refined_goal."
+            if force else
+            "Respond with your next step as JSON. If you already have enough to be specific and "
+            "measurable, respond with type 'refined'; otherwise ask one more focused question."
+        )
+    )
+    data = await _json_call(_CLARIFY_SYSTEM, user, 600)
+
+    typ = data.get("type")
+    if typ not in ("question", "refined"):
+        typ = "refined" if data.get("refined_goal") else "question"
+    out = {"type": typ, "message": _strip_em_dashes(str(data.get("message", "")))}
+    if typ == "refined":
+        refined = str(data.get("refined_goal") or data.get("message") or "")
+        out["refined_goal"] = _strip_em_dashes(refined)
+    return out
+
+
 async def plan_analysis(ctx: dict) -> dict:
     """Stage 1: understand the goal and the blockers. Feeds later stages."""
     system = (

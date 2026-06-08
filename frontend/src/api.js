@@ -58,6 +58,9 @@ export const api = {
 
   onboard: body => req('POST', '/onboarding', body),
 
+  // Goal clarification chat: returns {type:'question'|'refined', message, refined_goal?}
+  clarify: (conversation, life_area) => req('POST', '/onboarding/clarify', { conversation, life_area }),
+
   // Returns the raw Response for SSE streaming of the plan generation stages
   onboardStream: form => {
     const qs = new URLSearchParams({

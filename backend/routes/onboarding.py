@@ -16,11 +16,34 @@ from models.task import DailyTask
 from models.theme import Theme
 from models.user import User
 from services.llm import (
-    assemble_plan, day1_contents, generate_plan, plan_analysis, plan_chapters,
-    plan_inputs, plan_mission, plan_signal_day1, plan_tasks, plan_theme,
+    assemble_plan, clarify_goal, day1_contents, generate_plan, plan_analysis,
+    plan_chapters, plan_inputs, plan_mission, plan_signal_day1, plan_tasks, plan_theme,
 )
 
 router = APIRouter(prefix="/onboarding", tags=["onboarding"])
+
+
+class ClarifyMessage(BaseModel):
+    role: str  # 'ai' | 'user'
+    content: str
+
+
+class ClarifyRequest(BaseModel):
+    conversation: list[ClarifyMessage]
+    life_area: str | None = None
+
+
+@router.post("/clarify")
+async def clarify(
+    body: ClarifyRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Lightweight goal-clarification chat turn. No plan generation here."""
+    convo = [{"role": m.role, "content": m.content} for m in body.conversation]
+    try:
+        return await clarify_goal(convo, body.life_area)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Clarification failed: {exc}")
 
 
 class OnboardingRequest(BaseModel):
