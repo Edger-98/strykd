@@ -1,6 +1,7 @@
 import uuid as _uuid
+from datetime import datetime, timedelta, timezone
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from sqlalchemy import select
@@ -13,7 +14,13 @@ from models.user import User
 _bearer = HTTPBearer()
 
 
+def _new_token(user_id: str) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expire_minutes)
+    return jwt.encode({"sub": user_id, "exp": expire}, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
 async def get_current_user(
+    response: Response,
     credentials: HTTPAuthorizationCredentials = Depends(_bearer),
     db: AsyncSession = Depends(get_db),
 ) -> User:
@@ -37,4 +44,14 @@ async def get_current_user(
     user = await db.scalar(select(User).where(User.id == _uuid.UUID(user_id)))
     if user is None:
         raise exc
+
+    # Silent refresh: when the token is within the refresh window of expiry, mint
+    # a fresh 30-day token and hand it back via a response header. The frontend
+    # swaps it in transparently, so an active user never gets signed out.
+    exp = payload.get("exp")
+    if exp is not None:
+        remaining = datetime.fromtimestamp(exp, tz=timezone.utc) - datetime.now(timezone.utc)
+        if remaining < timedelta(minutes=settings.jwt_refresh_within_minutes):
+            response.headers["X-New-Token"] = _new_token(user_id)
+
     return user

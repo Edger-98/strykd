@@ -14,7 +14,8 @@ class Settings(BaseSettings):
     resend_from: str = "Strykd <noreply@strykdapp.com>"
     jwt_secret: str = "changeme"
     jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 60 * 24 * 7  # 7 days
+    jwt_expire_minutes: int = 60 * 24 * 30  # 30 days
+    jwt_refresh_within_minutes: int = 60 * 24 * 7  # reissue when within 7 days of expiry
     frontend_url: str = "http://localhost:5173"
     base_domain: str = "strykdapp.com"
     cron_secret: str = "changeme-cron-secret"

@@ -9,12 +9,19 @@ const authHeaders = () => ({
   Authorization: `Bearer ${getToken()}`,
 })
 
+// Silent refresh: if the backend handed back a fresh token, swap it in.
+function absorbRefresh(res) {
+  const t = res.headers.get('X-New-Token')
+  if (t) setToken(t)
+}
+
 async function req(method, path, body) {
   const res = await fetch(`${API}${path}`, {
     method,
     headers: authHeaders(),
     body: body != null ? JSON.stringify(body) : undefined,
   })
+  absorbRefresh(res)
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
     throw Object.assign(new Error(err.detail || 'Request failed'), { status: res.status })
@@ -31,6 +38,7 @@ async function upload(path, file) {
     headers: { Authorization: `Bearer ${getToken()}` },
     body: fd,
   })
+  absorbRefresh(res)
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
     throw Object.assign(new Error(err.detail || 'Upload failed'), { status: res.status })
