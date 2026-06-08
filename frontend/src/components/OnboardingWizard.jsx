@@ -97,7 +97,7 @@ export default function OnboardingWizard({ onSubmit, busy, error, mode = 'signup
             <button type="button" key={a.id} onClick={() => { set('aesthetic', a.id); advance('aesthetic') }}
               style={{ ...St.themeCard, borderColor: form.aesthetic === a.id ? 'var(--black)' : 'var(--gray-line)',
                 boxShadow: form.aesthetic === a.id ? '0 0 0 4px rgba(0,0,0,0.06)' : 'none' }}>
-              <div style={{ background: a.bg, borderRadius: 10, padding: 12, marginBottom: 12, aspectRatio: '4/3', display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'flex-end' }}>
+              <div style={{ background: a.bg, borderRadius: 10, padding: 12, marginBottom: 12, height: 104, aspectRatio: '4/3', minHeight: 96, display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'flex-end' }}>
                 <div style={{ width: 30, height: 4, borderRadius: 2, background: a.accent }} />
                 <div style={{ width: '90%', height: 8, borderRadius: 2, background: a.fg, opacity: 0.9 }} />
                 <div style={{ width: '60%', height: 8, borderRadius: 2, background: a.fg, opacity: 0.55 }} />
