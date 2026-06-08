@@ -80,16 +80,24 @@ async def _goal_journey(goal: Goal, db: AsyncSession, today: date) -> dict:
             total_tasks += t_total
             total_completed += t_done
             sw = signal_by_date.get(d)
-            proof_url = next((t.proof_url for t in day_tasks if t.proof_url), None)
+            is_future = d > today
+            proof_url = None if is_future else next((t.proof_url for t in day_tasks if t.proof_url), None)
+            # Future task content stays hidden server-side (anticipation + anti-gaming):
+            # only the count is exposed so the UI can show a locked state.
+            day_task_payload = (
+                [] if is_future else
+                [{"content": t.content, "voice_style": t.voice_style, "completed": t.completed,
+                  "proof_url": t.proof_url} for t in day_tasks]
+            )
             days.append({
                 "day_number": day_number, "date": _d(d),
-                "is_today": d == today, "is_past": d < today, "is_future": d > today,
+                "is_today": d == today, "is_past": d < today, "is_future": is_future,
                 "completed": t_total > 0 and t_done == t_total,
                 "tasks_total": t_total, "tasks_completed": t_done,
+                "locked": is_future,
                 "proof_url": proof_url,
                 "is_video": bool(proof_url and proof_url.lower().endswith(".mp4")),
-                "tasks": [{"content": t.content, "voice_style": t.voice_style, "completed": t.completed,
-                           "proof_url": t.proof_url} for t in day_tasks],
+                "tasks": day_task_payload,
                 "signal": {"ai_summary": sw.ai_summary, "tasks_completed": sw.tasks_completed,
                            "tasks_total": sw.tasks_total} if sw else None,
             })
