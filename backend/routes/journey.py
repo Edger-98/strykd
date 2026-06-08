@@ -4,7 +4,7 @@ from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
@@ -173,6 +173,29 @@ async def update_goal(
     await db.refresh(goal)
     await bust_public_page(current_user.slug)
     return {"id": str(goal.id), "status": goal.status, "page_public": goal.page_public}
+
+
+@router.delete("/goals/{goal_id}", status_code=204)
+async def delete_goal(
+    goal_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Permanently delete a goal and everything tied to it."""
+    try:
+        gid = uuid.UUID(goal_id)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid goal ID")
+    goal = await db.scalar(select(Goal).where(Goal.id == gid, Goal.user_id == current_user.id))
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+
+    await db.execute(delete(SignalWall).where(SignalWall.goal_id == gid))
+    await db.execute(delete(DailyTask).where(DailyTask.goal_id == gid))
+    await db.delete(goal)
+    await db.commit()
+    await bust_public_page(current_user.slug)
+    return
 
 
 @router.get("/goals/{goal_id}/grid")

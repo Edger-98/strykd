@@ -101,6 +101,7 @@ export const api = {
 
   // Goal pause/resume + public visibility
   updateGoal: (id, body) => req('PATCH', `/goals/${id}`, body),
+  deleteGoal: id => req('DELETE', `/goals/${id}`),
 
   // Password reset
   forgotPassword: email => req('POST', '/auth/forgot-password', { email }),

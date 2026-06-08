@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   Menu, X, MapPin, Check, Sparkles, TrendingUp, Calendar, ChevronDown, Plus, Flame,
-  Pause, Play, Eye, EyeOff, Loader2, Film,
+  Pause, Play, Eye, EyeOff, Loader2, Film, Trash2,
 } from 'lucide-react'
 import DashSidebar, { SIDEBAR_W } from '../components/DashSidebar'
 import AddGoalModal from '../components/AddGoalModal'
@@ -87,6 +87,13 @@ function GoalCard({ goal, index, expanded, onToggle, onPickDay, reload }) {
   }
   const togglePause = e => { e.stopPropagation(); update('pause', { status: paused ? 'active' : 'paused' }) }
   const togglePublic = e => { e.stopPropagation(); update('public', { page_public: !goal.page_public }) }
+  const remove = async e => {
+    e.stopPropagation()
+    if (!window.confirm('Delete this goal? This will permanently remove all tasks, signal wall entries, and progress. This cannot be undone.')) return
+    setBusy('delete')
+    try { await api.deleteGoal(goal.id); reload() }
+    catch (err) { console.error(err); setBusy('') }
+  }
 
   return (
     <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: index * 0.05 }}
@@ -121,6 +128,10 @@ function GoalCard({ goal, index, expanded, onToggle, onPickDay, reload }) {
         <button onClick={togglePublic} disabled={!!busy} style={S.ctrlBtn}>
           {busy === 'public' ? <Loader2 size={13} className="spin-icon" /> : goal.page_public ? <Eye size={13} /> : <EyeOff size={13} />}
           {goal.page_public ? 'Public' : 'Private'}
+        </button>
+        <button onClick={remove} disabled={!!busy} style={{ ...S.ctrlBtn, marginLeft: 'auto', color: 'var(--red)', borderColor: 'rgba(255,45,45,0.4)' }}>
+          {busy === 'delete' ? <Loader2 size={13} className="spin-icon" /> : <Trash2 size={13} />}
+          Delete
         </button>
       </div>
 
