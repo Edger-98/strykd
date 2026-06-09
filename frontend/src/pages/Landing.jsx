@@ -96,12 +96,13 @@ export default function Landing() {
         <div className="container-narrow">
           <motion.h1 className="h-hero" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}>
-            The todo app that actually<br />holds you accountable.
+            Become the person who<br />actually follows through.
           </motion.h1>
           <motion.p className="lead" style={{ maxWidth: 600, margin: '28px auto 0' }}
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.12, ease: [0.16, 1, 0.3, 1] }}>
-            AI builds your daily plan. Your own live page keeps you honest. Collaborate with
-            others on shared goals and lists.
+            Strykd turns your goal into a daily plan, then makes quitting impossible: a streak
+            you won't want to break, a public page that keeps you honest, and an AI coach that
+            adapts as life shifts. Show up daily. Don't break the chain.
           </motion.p>
           <motion.div style={S.heroCtas}
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.24, ease: [0.16, 1, 0.3, 1] }}>
@@ -197,9 +198,9 @@ export default function Landing() {
       <section className="section bg-black center">
         <div className="container-narrow">
           <Reveal>
-            <h2 className="h-xl display" style={{ marginBottom: 28 }}>Ready to show up?</h2>
+            <h2 className="h-xl display" style={{ marginBottom: 28 }}>Your streak starts today.</h2>
             <p className="lead" style={{ color: 'rgba(255,255,255,0.7)', maxWidth: 480, margin: '0 auto 36px' }}>
-              Your first week is free. Your future self is waiting.</p>
+              The hardest part is day one. Start free, and let the chain do the rest.</p>
             <button className="pill pill-white pill-lg" onClick={() => setView('register')}>
               Start free <ArrowRight size={18} />
             </button>
