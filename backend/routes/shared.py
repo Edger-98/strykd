@@ -2,7 +2,8 @@ import secrets
 import string
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from jose import JWTError, jwt
 from pydantic import BaseModel
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +14,18 @@ from deps import get_current_user
 from models.shared_list import SharedList, SharedListTask
 from models.user import User
 from services.llm import generate_itinerary
+
+
+def _is_list_owner(request: Request, lst: SharedList) -> bool:
+    """True if the request carries a valid token for the list's owner."""
+    auth = request.headers.get("authorization", "")
+    if not auth.lower().startswith("bearer "):
+        return False
+    try:
+        payload = jwt.decode(auth[7:], settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        return str(payload.get("sub")) == str(lst.user_id)
+    except JWTError:
+        return False
 
 router = APIRouter(tags=["shared"])
 
@@ -45,6 +58,8 @@ def _task_dict(t: SharedListTask) -> dict:
         "content": t.content,
         "completed": t.completed,
         "completed_by": t.completed_by,
+        "assigned_to": t.assigned_to,
+        "added_by_session": t.added_by_session,
         "created_at": t.created_at.isoformat() if t.created_at else None,
     }
 
@@ -120,11 +135,14 @@ async def make_itinerary(code: str, db: AsyncSession = Depends(get_db), current_
 # ── Public (no account) ────────────────────────────────────────────────────
 class GuestTask(BaseModel):
     content: str
-    guest_name: str | None = None
+    assigned_to: str | None = None
+    session: str | None = None  # anonymous guest session id (for delete permissions)
 
 
-class GuestToggle(BaseModel):
-    completed: bool
+class GuestEdit(BaseModel):
+    completed: bool | None = None
+    content: str | None = None
+    assigned_to: str | None = None
     guest_name: str | None = None
 
 
@@ -136,11 +154,12 @@ async def _list_by_code(code: str, db: AsyncSession) -> SharedList:
 
 
 @router.get("/shared/{code}")
-async def view_shared(code: str, db: AsyncSession = Depends(get_db)):
+async def view_shared(code: str, request: Request, db: AsyncSession = Depends(get_db)):
     lst = await _list_by_code(code, db)
     res = await db.execute(select(SharedListTask).where(SharedListTask.list_id == lst.id).order_by(SharedListTask.created_at))
     data = _list_dict(lst)
     data["tasks"] = [_task_dict(t) for t in res.scalars().all()]
+    data["is_owner"] = _is_list_owner(request, lst)
     return data
 
 
@@ -153,15 +172,18 @@ async def add_shared_task(code: str, body: GuestTask, db: AsyncSession = Depends
     count = await db.scalar(select(func.count()).select_from(SharedListTask).where(SharedListTask.list_id == lst.id)) or 0
     if count >= MAX_TASKS:
         raise HTTPException(status_code=429, detail="This list is full")
-    t = SharedListTask(list_id=lst.id, content=content[:300])
+    t = SharedListTask(
+        list_id=lst.id, content=content[:300],
+        assigned_to=(body.assigned_to or "").strip()[:40] or None,
+        added_by_session=(body.session or "").strip()[:64] or None,
+    )
     db.add(t)
     await db.commit()
     await db.refresh(t)
     return _task_dict(t)
 
 
-@router.patch("/shared/{code}/tasks/{task_id}")
-async def toggle_shared_task(code: str, task_id: str, body: GuestToggle, db: AsyncSession = Depends(get_db)):
+async def _shared_task(code: str, task_id: str, db: AsyncSession) -> tuple[SharedList, SharedListTask]:
     lst = await _list_by_code(code, db)
     try:
         tid = uuid.UUID(task_id)
@@ -170,8 +192,37 @@ async def toggle_shared_task(code: str, task_id: str, body: GuestToggle, db: Asy
     t = await db.scalar(select(SharedListTask).where(SharedListTask.id == tid, SharedListTask.list_id == lst.id))
     if not t:
         raise HTTPException(status_code=404, detail="Task not found")
-    t.completed = body.completed
-    t.completed_by = ((body.guest_name or "").strip()[:40] or "A guest") if body.completed else None
+    return lst, t
+
+
+@router.patch("/shared/{code}/tasks/{task_id}")
+async def edit_shared_task(code: str, task_id: str, body: GuestEdit, db: AsyncSession = Depends(get_db)):
+    """Anyone with the link can toggle, edit text, or set who a task is assigned to."""
+    _, t = await _shared_task(code, task_id, db)
+    if body.completed is not None:
+        t.completed = body.completed
+        t.completed_by = ((body.guest_name or "").strip()[:40] or "A guest") if body.completed else None
+    if body.content is not None:
+        c = body.content.strip()
+        if c:
+            t.content = c[:300]
+    if body.assigned_to is not None:
+        t.assigned_to = body.assigned_to.strip()[:40] or None
     await db.commit()
     await db.refresh(t)
     return _task_dict(t)
+
+
+@router.delete("/shared/{code}/tasks/{task_id}", status_code=204)
+async def delete_shared_task(code: str, task_id: str, request: Request, session: str | None = None,
+                             db: AsyncSession = Depends(get_db)):
+    """The list owner can delete any task; a guest can delete only tasks they added
+    (matched by their session id, passed as ?session=)."""
+    lst, t = await _shared_task(code, task_id, db)
+    owner = _is_list_owner(request, lst)
+    is_adder = bool(session and t.added_by_session and session == t.added_by_session)
+    if not (owner or is_adder):
+        raise HTTPException(status_code=403, detail="You can only delete tasks you added.")
+    await db.delete(t)
+    await db.commit()
+    return

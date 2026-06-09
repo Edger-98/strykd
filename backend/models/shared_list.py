@@ -28,4 +28,6 @@ class SharedListTask(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     completed: Mapped[bool] = mapped_column(Boolean, default=False)
     completed_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    assigned_to: Mapped[str | None] = mapped_column(String, nullable=True)
+    added_by_session: Mapped[str | None] = mapped_column(String, nullable=True)  # guest session that created it
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

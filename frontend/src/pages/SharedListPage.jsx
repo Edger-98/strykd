@@ -1,10 +1,17 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Check, Plus, Loader2, Sparkles, MapPin, Package, Lightbulb, ArrowRight } from 'lucide-react'
+import { Check, Plus, Loader2, Sparkles, MapPin, Package, Lightbulb, ArrowRight, Trash2, User } from 'lucide-react'
 import { api } from '../api'
 
 const NAME_KEY = 'strykd_guest_name'
+const SESSION_KEY = 'strykd_guest_session'
+
+function getSession() {
+  let s = localStorage.getItem(SESSION_KEY)
+  if (!s) { s = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2)); localStorage.setItem(SESSION_KEY, s) }
+  return s
+}
 
 export default function SharedListPage() {
   const { code } = useParams()
@@ -12,8 +19,12 @@ export default function SharedListPage() {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [input, setInput] = useState('')
+  const [assignee, setAssignee] = useState('')
   const [guest, setGuest] = useState(() => localStorage.getItem(NAME_KEY) || '')
   const [busy, setBusy] = useState(false)
+  const [editing, setEditing] = useState(null)
+  const [draft, setDraft] = useState('')
+  const session = getSession()
 
   const load = useCallback(() => {
     api.getSharedList(code).then(setData).catch(() => setError('This list does not exist.'))
@@ -24,24 +35,38 @@ export default function SharedListPage() {
   if (error) return <Splash>{error}</Splash>
   if (!data) return <Splash>Loading…</Splash>
 
+  const isOwner = !!data.is_owner
   const saveGuest = v => { setGuest(v); localStorage.setItem(NAME_KEY, v) }
+  const canDelete = t => isOwner || (t.added_by_session && t.added_by_session === session)
 
   const add = async () => {
     const c = input.trim()
     if (!c || busy) return
     setBusy(true)
     try {
-      const t = await api.addSharedTask(code, { content: c, guest_name: guest || undefined })
+      const t = await api.addSharedTask(code, { content: c, assigned_to: assignee.trim() || undefined, session })
       setData(d => ({ ...d, tasks: [...d.tasks, t] }))
-      setInput('')
+      setInput(''); setAssignee('')
     } catch (e) { /* ignore */ } finally { setBusy(false) }
   }
 
   const toggle = async t => {
     const next = !t.completed
     setData(d => ({ ...d, tasks: d.tasks.map(x => x.id === t.id ? { ...x, completed: next, completed_by: next ? (guest || 'A guest') : null } : x) }))
-    try { await api.toggleSharedTask(code, t.id, { completed: next, guest_name: guest || undefined }) }
+    try { await api.editSharedTask(code, t.id, { completed: next, guest_name: guest || undefined }) }
     catch (e) { load() }
+  }
+
+  const saveEdit = async t => {
+    const c = draft.trim(); setEditing(null)
+    if (!c || c === t.content) return
+    setData(d => ({ ...d, tasks: d.tasks.map(x => x.id === t.id ? { ...x, content: c } : x) }))
+    try { await api.editSharedTask(code, t.id, { content: c }) } catch (e) { load() }
+  }
+
+  const remove = async t => {
+    setData(d => ({ ...d, tasks: d.tasks.filter(x => x.id !== t.id) }))
+    try { await api.deleteSharedTask(code, t.id, session) } catch (e) { load() }
   }
 
   const done = data.tasks.filter(t => t.completed).length
@@ -57,13 +82,10 @@ export default function SharedListPage() {
 
         <div style={{ marginTop: 24 }}>
           {data.tasks.map(t => (
-            <motion.div key={t.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} style={S.row}>
-              <button onClick={() => toggle(t)} style={{ ...S.check, background: t.completed ? 'var(--red)' : 'transparent', borderColor: t.completed ? 'var(--red)' : 'var(--gray-line)' }}>
-                {t.completed && <Check size={14} color="#fff" strokeWidth={3} />}
-              </button>
-              <span style={{ flex: 1, color: t.completed ? 'var(--gray-light)' : 'var(--ink)', textDecoration: t.completed ? 'line-through' : 'none' }}>{t.content}</span>
-              {t.completed && t.completed_by && <span style={S.by}>{t.completed_by}</span>}
-            </motion.div>
+            <Row key={t.id} t={t} editing={editing === t.id} draft={draft} setDraft={setDraft}
+              canDelete={canDelete(t)} onToggle={() => toggle(t)}
+              onBeginEdit={() => { setEditing(t.id); setDraft(t.content) }} onSaveEdit={() => saveEdit(t)}
+              onRemove={() => remove(t)} />
           ))}
           {data.tasks.length === 0 && <p style={{ color: 'var(--gray-light)', padding: '16px 0' }}>No tasks yet. Add the first one below.</p>}
         </div>
@@ -76,8 +98,12 @@ export default function SharedListPage() {
             {busy ? <Loader2 size={16} className="spin-icon" /> : <><Plus size={16} /> Add</>}
           </button>
         </div>
-        <input className="field" value={guest} onChange={e => saveGuest(e.target.value)} placeholder="Your name (optional)"
-          style={{ marginTop: 10, fontSize: '0.9rem', padding: '0.7rem 1rem' }} />
+        <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+          <input className="field" value={assignee} onChange={e => setAssignee(e.target.value)} placeholder="Assign to (optional)"
+            style={{ fontSize: '0.9rem', padding: '0.7rem 1rem' }} />
+          <input className="field" value={guest} onChange={e => saveGuest(e.target.value)} placeholder="Your name (optional)"
+            style={{ fontSize: '0.9rem', padding: '0.7rem 1rem' }} />
+        </div>
 
         {/* itinerary */}
         {it && (
@@ -111,6 +137,34 @@ export default function SharedListPage() {
   )
 }
 
+function Row({ t, editing, draft, setDraft, canDelete, onToggle, onBeginEdit, onSaveEdit, onRemove }) {
+  const [hover, setHover] = useState(false)
+  return (
+    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} style={S.row}
+      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+      <button onClick={onToggle} style={{ ...S.check, background: t.completed ? 'var(--red)' : 'transparent', borderColor: t.completed ? 'var(--red)' : 'var(--gray-line)' }}>
+        {t.completed && <Check size={14} color="#fff" strokeWidth={3} />}
+      </button>
+      {editing ? (
+        <input autoFocus className="field" value={draft} onChange={e => setDraft(e.target.value)}
+          onBlur={onSaveEdit} onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') onSaveEdit() }}
+          style={{ flex: 1, fontSize: '0.95rem', padding: '0.5rem 0.7rem' }} />
+      ) : (
+        <span onClick={onBeginEdit} title="Click to edit" style={{ flex: 1, cursor: 'text',
+          color: t.completed ? 'var(--gray-light)' : 'var(--ink)', textDecoration: t.completed ? 'line-through' : 'none' }}>
+          {t.content}
+        </span>
+      )}
+      {t.assigned_to && <span style={S.assignee}><User size={11} /> {t.assigned_to}</span>}
+      {t.completed && t.completed_by && <span style={S.by}>{t.completed_by}</span>}
+      {canDelete && (
+        <button onClick={onRemove} aria-label="Delete task"
+          style={{ ...S.del, opacity: hover ? 0.8 : 0 }}><Trash2 size={15} /></button>
+      )}
+    </motion.div>
+  )
+}
+
 function Splash({ children }) {
   return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: 'var(--gray-section)' }}><p style={{ color: 'var(--gray-text)' }}>{children}</p></div>
 }
@@ -125,6 +179,8 @@ const S = {
   row: { display: 'flex', alignItems: 'center', gap: 14, padding: '14px 0', borderBottom: '1px solid var(--gray-line)' },
   check: { width: 24, height: 24, borderRadius: 7, border: '2px solid var(--gray-line)', flexShrink: 0, display: 'grid', placeItems: 'center', cursor: 'pointer' },
   by: { fontSize: '0.72rem', color: 'var(--gray-light)', background: 'var(--gray-section)', borderRadius: 50, padding: '3px 9px', flexShrink: 0 },
+  assignee: { display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.72rem', color: 'var(--red)', background: 'rgba(255,45,45,0.08)', borderRadius: 50, padding: '3px 9px', flexShrink: 0, fontWeight: 600 },
+  del: { background: 'none', border: 'none', color: 'var(--gray-light)', padding: 4, display: 'grid', placeItems: 'center', cursor: 'pointer', flexShrink: 0, transition: 'opacity 0.15s' },
   addBox: { display: 'flex', gap: 10, marginTop: 24, alignItems: 'stretch' },
   sectionTitle: { color: 'var(--gray-text)', marginBottom: 16, paddingBottom: 10, borderBottom: '1px solid var(--gray-line)' },
   block: { padding: '14px 16px', background: 'var(--gray-section)', borderRadius: 12, marginBottom: 10 },

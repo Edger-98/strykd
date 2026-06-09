@@ -89,9 +89,22 @@ export const api = {
   getSharedLists: () => req('GET', '/shared-lists'),
   deleteSharedList: code => req('DELETE', `/shared-lists/${code}`),
   generateItinerary: code => req('POST', `/shared-lists/${code}/itinerary`),
-  getSharedList: code => fetch(`${API}/shared/${code}`).then(r => r.ok ? r.json() : Promise.reject(r)),
+  getSharedList: code => {
+    const headers = {}
+    const tok = getToken(); if (tok) headers.Authorization = `Bearer ${tok}`
+    return fetch(`${API}/shared/${code}`, { headers }).then(r => r.ok ? r.json() : Promise.reject(r))
+  },
   addSharedTask: (code, body) => publicJson('POST', `/shared/${code}/tasks`, body),
-  toggleSharedTask: (code, id, body) => publicJson('PATCH', `/shared/${code}/tasks/${id}`, body),
+  editSharedTask: (code, id, body) => publicJson('PATCH', `/shared/${code}/tasks/${id}`, body),
+  deleteSharedTask: (code, id, session) => {
+    const qs = session ? `?session=${encodeURIComponent(session)}` : ''
+    const headers = {}
+    const tok = getToken(); if (tok) headers.Authorization = `Bearer ${tok}`
+    return fetch(`${API}/shared/${code}/tasks/${id}${qs}`, { method: 'DELETE', headers }).then(async r => {
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw Object.assign(new Error(e.detail || 'Failed'), { status: r.status }) }
+      return true
+    })
+  },
 
   onboard: body => req('POST', '/onboarding', body),
 
