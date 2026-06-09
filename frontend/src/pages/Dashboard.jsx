@@ -220,7 +220,7 @@ export default function Dashboard() {
             {activeGoal ? (
               <>
                 <h2 className="eyebrow" style={S.sectionTitle}>Today's Tasks</h2>
-                <Checklist tasks={goalTasks} onComplete={onTaskComplete} reload={load} />
+                <Checklist tasks={goalTasks} onComplete={onTaskComplete} reload={load} goalName={activeGoal.description} />
                 <ReplanPanel goalId={activeGoal.id} taskDate={taskDate} onConfirmed={load} />
               </>
             ) : (

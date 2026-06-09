@@ -3,6 +3,7 @@ import { motion, Reorder, useDragControls } from 'framer-motion'
 import { Check, Trash2, GripVertical, Camera } from 'lucide-react'
 import { api } from '../api'
 import ProofModal from './ProofModal'
+import AddToCalendar from './AddToCalendar'
 
 const VOICE = {
   direct: { label: 'DIRECT', color: '#0071E3' },
@@ -19,7 +20,7 @@ const VOICE = {
  *  - onComplete(taskId, res): fired after checking a task (for streak updates)
  *  - reload(): re-fetch parent data after uncheck / delete / reorder
  */
-export default function Checklist({ tasks = [], onComplete, reload }) {
+export default function Checklist({ tasks = [], onComplete, reload, goalName = '' }) {
   const [items, setItems] = useState(tasks)
   const [loading, setLoading] = useState({})
   const [editing, setEditing] = useState(null)
@@ -80,7 +81,7 @@ export default function Checklist({ tasks = [], onComplete, reload }) {
     <>
       <Reorder.Group axis="y" values={items} onReorder={persistOrder} style={{ listStyle: 'none', margin: 0, padding: 0 }}>
         {items.map((task, i) => (
-          <Row key={task.id} task={task} last={i === items.length - 1}
+          <Row key={task.id} task={task} last={i === items.length - 1} goalName={goalName}
             busy={!!loading[task.id]} editing={editing === task.id}
             draft={draft} setDraft={setDraft}
             onToggle={() => toggle(task)} onBeginEdit={() => beginEdit(task)}
@@ -94,7 +95,7 @@ export default function Checklist({ tasks = [], onComplete, reload }) {
   )
 }
 
-function Row({ task, last, busy, editing, draft, setDraft, onToggle, onBeginEdit, onSaveEdit, onRemove, onProof }) {
+function Row({ task, last, busy, editing, draft, setDraft, onToggle, onBeginEdit, onSaveEdit, onRemove, onProof, goalName }) {
   const controls = useDragControls()
   const [hover, setHover] = useState(false)
   const inputRef = useRef(null)
@@ -141,6 +142,11 @@ function Row({ task, last, busy, editing, draft, setDraft, onToggle, onBeginEdit
           </span>
         </span>
       )}
+
+      {/* add to calendar */}
+      <span style={{ flexShrink: 0, opacity: hover ? 0.8 : 0.35, transition: 'opacity 0.15s' }}>
+        <AddToCalendar title={task.content} date={task.task_date} description={goalName} dark />
+      </span>
 
       {/* proof upload */}
       <button onClick={onProof} aria-label="Submit proof"

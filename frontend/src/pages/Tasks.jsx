@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import DashSidebar, { SIDEBAR_W } from '../components/DashSidebar'
 import ContributionGrid from '../components/ContributionGrid'
+import AddToCalendar from '../components/AddToCalendar'
 import { pageVariants } from '../motion'
 import { api, clearToken, getToken } from '../api'
 
@@ -206,6 +207,9 @@ function TodoRow({ t, subs, expanded, onExpand, onToggle, onRemove, onChanged })
           <Calendar size={11} /> {fmtDue(t.due_date)}</span>}
         {(t.tags || []).map(tag => <span key={tag} style={S.tag}>#{tag}</span>)}
 
+        <span style={{ opacity: hover ? 0.8 : 0.35, transition: 'opacity 0.15s' }}>
+          <AddToCalendar title={t.content} date={t.due_date || t.task_date} description="Strykd task" dark size={15} />
+        </span>
         {hasDetail && (
           <button onClick={onExpand} style={S.iconBtn} aria-label="Expand">
             {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
