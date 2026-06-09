@@ -12,6 +12,7 @@ import Onboarding from './pages/Onboarding'
 import PublicPage from './pages/PublicPage'
 import ResetPassword from './pages/ResetPassword'
 import SharedListPage from './pages/SharedListPage'
+import Contact from './pages/Contact'
 
 function AnimatedRoutes() {
   const location = useLocation()
@@ -20,6 +21,7 @@ function AnimatedRoutes() {
       <Routes location={location} key={location.pathname}>
         <Route path="/" element={<Landing />} />
         <Route path="/onboard" element={<Onboarding />} />
+        <Route path="/contact" element={<Contact />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/dashboard/journey" element={<Journey />} />
         <Route path="/dashboard/tasks" element={<Tasks />} />

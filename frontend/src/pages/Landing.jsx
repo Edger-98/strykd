@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   ArrowRight, ArrowLeft, Star, Target, Sparkles, Globe, Zap,
-  CheckCircle2, TrendingUp, Loader2,
+  CheckCircle2, TrendingUp, Loader2, Users, Calendar,
 } from 'lucide-react'
 import { pageVariants, revealVariants, staggerContainer, staggerItem, inView } from '../motion'
 import { api, setToken } from '../api'
@@ -15,6 +15,7 @@ const STEPS = [
   { n: '01', t: 'Tell us your goal', d: 'Answer a few honest questions about what you want and what has stopped you before.' },
   { n: '02', t: 'AI builds your plan', d: 'Get a personalized day-by-day plan, a visual identity, and a live page in seconds.' },
   { n: '03', t: 'Show up daily', d: 'Check off tasks, keep your streak alive, and replan with AI whenever life shifts.' },
+  { n: '04', t: 'Invite others', d: 'Share your page or collaborate on a list. Accountability works better together.' },
 ]
 
 const REVIEWS = [
@@ -40,6 +41,8 @@ const FEATURES = [
   { Icon: TrendingUp, t: 'Streaks that hold you', d: 'A streak counter and signal wall that make not showing up feel like a real loss.' },
   { Icon: Globe, t: 'Your own live page', d: 'A shareable page on your own subdomain, with your mission, progress, and daily wins, public or private.' },
   { Icon: Zap, t: 'Replan in real time', d: 'Life shifts. Tell the AI what changed and watch your plan rewrite itself, live.' },
+  { Icon: Users, t: 'Collaborative lists', d: 'Plan trips, events, and projects with anyone. Share a link, no account needed.' },
+  { Icon: Calendar, t: 'Calendar sync', d: 'Add any task to Google or Apple Calendar in one tap. Your plan, in your day.' },
 ]
 
 export default function Landing() {
@@ -93,12 +96,12 @@ export default function Landing() {
         <div className="container-narrow">
           <motion.h1 className="h-hero" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}>
-            Your goals.<br />Finally accountable.
+            The todo app that actually<br />holds you accountable.
           </motion.h1>
-          <motion.p className="lead" style={{ maxWidth: 560, margin: '28px auto 0' }}
+          <motion.p className="lead" style={{ maxWidth: 600, margin: '28px auto 0' }}
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.12, ease: [0.16, 1, 0.3, 1] }}>
-            Strykd turns what you want into a daily plan you actually follow, with an AI coach,
-            a streak that holds you, and a live page that makes it real.
+            AI builds your daily plan. Your own live page keeps you honest. Collaborate with
+            others on shared goals and lists.
           </motion.p>
           <motion.div style={S.heroCtas}
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.24, ease: [0.16, 1, 0.3, 1] }}>
@@ -208,8 +211,11 @@ export default function Landing() {
       <footer style={{ padding: '48px 0', borderTop: '1px solid var(--gray-line)' }}>
         <div className="container" style={S.footer}>
           <span style={{ fontWeight: 800, letterSpacing: '0.1em' }}>STRYKD</span>
-          <span style={{ color: 'var(--gray-light)', fontSize: '0.85rem' }}>
-            © {new Date().getFullYear()} Strykd · AI accountability that ships.
+          <span style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
+            <a href="/contact" style={S.footLink}>Contact</a>
+            <span style={{ color: 'var(--gray-light)', fontSize: '0.85rem' }}>
+              © {new Date().getFullYear()} Strykd · AI accountability that ships.
+            </span>
           </span>
         </div>
       </footer>
@@ -332,6 +338,7 @@ const S = {
   featGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 24 },
   featCard: { padding: 40 },
   footer: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 },
+  footLink: { color: 'var(--ink)', fontSize: '0.85rem', fontWeight: 600, textDecoration: 'none' },
   authCard: { width: '100%', maxWidth: 440, padding: 'clamp(28px, 5vw, 44px)' },
   authBack: { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: 'var(--gray-text)',
     fontWeight: 600, fontSize: '0.88rem', marginBottom: 24 },
