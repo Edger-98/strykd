@@ -110,9 +110,10 @@ export default function Dashboard() {
 
   const { user, goals = [], quick_tasks = [], signal_wall, trial } = data
 
-  // Day 8+ with no subscription, full-screen upgrade lock (unless they just paid)
+  // Trial over with no subscription, full-screen upgrade lock (unless they just paid)
   if (trial?.locked && !justSubscribed) {
     return <UpgradePrompt user={user} subscribe={subscribe} busy={subBusy} error={subError}
+      onManageGoals={() => nav('/dashboard/journey')}
       onLogout={() => { clearToken(); nav('/') }} />
   }
 
@@ -300,7 +301,7 @@ function Centered({ children }) {
   )
 }
 
-function UpgradePrompt({ user, subscribe, busy, error, onLogout }) {
+function UpgradePrompt({ user, subscribe, busy, error, onLogout, onManageGoals }) {
   return (
     <div style={S.lockShell}>
       <motion.div style={S.lockCard} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
@@ -323,6 +324,9 @@ function UpgradePrompt({ user, subscribe, busy, error, onLogout }) {
         </button>
 
         <div style={S.lockFoot}>
+          {onManageGoals && (
+            <button onClick={onManageGoals} style={S.lockLink}><TargetIcon size={14} /> Manage my goals</button>
+          )}
           {user.page_public !== false && (
             <a href={`/${user.slug}`} target="_blank" rel="noreferrer" style={S.lockLink}>
               <ExternalLink size={14} /> View your public page

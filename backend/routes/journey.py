@@ -124,8 +124,10 @@ async def _goal_journey(goal: Goal, db: AsyncSession, today: date) -> dict:
 @router.get("/journey")
 async def journey(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_active_access),
+    current_user: User = Depends(get_current_user),
 ):
+    # Viewing and managing your own goals (pause, delete) is never paywalled;
+    # only the AI generation/replan features are gated by require_active_access.
     goals_res = await db.execute(
         select(Goal).where(
             Goal.user_id == current_user.id, Goal.status.in_(["active", "paused"])
