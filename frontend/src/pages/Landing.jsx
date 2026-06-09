@@ -109,7 +109,7 @@ export default function Landing() {
           </motion.div>
           <motion.p style={S.heroFine}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.7, delay: 0.4 }}>
-            7 days free · No credit card needed · Cancel anytime
+            3 days free · No credit card needed · Cancel anytime
           </motion.p>
         </div>
       </header>
@@ -232,7 +232,7 @@ function AuthView({ view, form, upd, submit, error, busy, toggle, forgot, back }
       <div className="card" style={S.authCard}>
         <button onClick={back} style={S.authBack}><ArrowLeft size={16} /> Back</button>
         <h1 className="h-lg display" style={{ marginBottom: 8 }}>
-          {view === 'login' ? 'Welcome back.' : 'Start your free week.'}
+          {view === 'login' ? 'Welcome back.' : 'Start your free trial.'}
         </h1>
         <p className="lead" style={{ fontSize: '1rem', marginBottom: 28 }}>
           {view === 'login' ? 'Pick up right where you left off.' : 'No credit card. Cancel anytime. Just show up.'}

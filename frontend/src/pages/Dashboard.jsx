@@ -160,7 +160,7 @@ export default function Dashboard() {
           <motion.div style={S.endBanner} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
               <Flame size={20} color="var(--red)" style={{ flexShrink: 0 }} />
-              <span><strong>Your free week ends tomorrow.</strong> Keep your streak alive.</span>
+              <span><strong>Your free trial ends tomorrow.</strong> Keep your streak alive.</span>
             </span>
             <button className="pill pill-blue pill-sm" onClick={subscribe} disabled={subBusy} style={{ flexShrink: 0 }}>
               {subBusy ? <Loader2 size={15} className="spin-icon" /> : <><CreditCard size={15} /> Subscribe for $9/month</>}
@@ -175,7 +175,7 @@ export default function Dashboard() {
             <span style={{ flex: 1 }}>
               {justSubscribed
                 ? <><strong>You're subscribed.</strong> Thanks for backing yourself. Keep showing up.</>
-                : <><strong>Your free week has started.</strong> Full access, no card. Now show up and don't break the streak.</>}
+                : <><strong>Your free trial has started.</strong> Full access, no card. Now show up and don't break the streak.</>}
             </span>
             <button onClick={() => setBannerDismissed(true)} style={S.icon} aria-label="Dismiss"><X size={16} /></button>
           </motion.div>
@@ -306,7 +306,7 @@ function UpgradePrompt({ user, subscribe, busy, error, onLogout }) {
       <motion.div style={S.lockCard} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}>
         <div style={S.lockIcon}><Lock size={26} color="var(--red)" /></div>
-        <h1 className="h-lg display" style={{ marginBottom: 12 }}>Your free week has ended.</h1>
+        <h1 className="h-lg display" style={{ marginBottom: 12 }}>Your free trial has ended.</h1>
         <p style={{ color: 'var(--d-text-dim)', fontSize: '1.05rem', lineHeight: 1.55, marginBottom: 8 }}>
           {user.streak_days > 0
             ? <>Don't lose your <strong style={{ color: 'var(--red)' }}>{user.streak_days}-day streak</strong>. Subscribe to keep your plan, your AI coach, and your momentum.</>

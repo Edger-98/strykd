@@ -111,13 +111,13 @@ async def send_trial_ending_email(to: str, name: str) -> None:
     first = (name or "there").split(" ")[0]
     body = (
         f'<h1 style="font-size:28px;font-weight:800;margin:16px 0;">'
-        f'Your free week is almost up, {first}.</h1>'
+        f'Your free trial is almost up, {first}.</h1>'
         '<p style="color:#A1A1A1;font-size:16px;line-height:1.6;">'
-        "Tomorrow your 7-day free trial ends. Keep your plan, your AI coach, and your "
+        "Tomorrow your free trial ends. Keep your plan, your AI coach, and your "
         "streak going for $9/month, or cancel anytime before then and you won't be charged.</p>"
         + _button(f"{settings.frontend_url}/dashboard/settings", "Manage my subscription")
     )
-    await _send_async(to, "Your Strykd free week ends tomorrow", _shell(body))
+    await _send_async(to, "Your Strykd free trial ends tomorrow", _shell(body))
 
 
 async def send_inactivity_nudge_email(to: str, name: str) -> None:

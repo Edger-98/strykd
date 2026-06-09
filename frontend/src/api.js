@@ -144,7 +144,7 @@ export const api = {
     return r.json()
   }),
 
-  // Creates a Stripe Checkout session (7-day trial); returns { checkout_url }
+  // Creates a Stripe Checkout session (3-day trial); returns { checkout_url }
   checkout: () => req('POST', '/billing/checkout'),
   billingPortal: () => req('POST', '/billing/portal'),
   cancelSubscription: () => req('POST', '/billing/cancel'),

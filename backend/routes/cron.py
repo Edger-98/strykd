@@ -17,7 +17,7 @@ from services.email import (
     send_trial_ending_email,
 )
 from services.llm import generate_nightly
-from trial import trial_status
+from trial import TRIAL_DAYS, trial_status
 
 router = APIRouter(prefix="/cron", tags=["cron"])
 
@@ -128,7 +128,7 @@ async def streak_reminders(
     if x_cron_secret != settings.cron_secret:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    # Trial-ending email on day 6 (the day before the free week ends), deduped.
+    # Trial-ending email on the last full day (locks the next day), deduped.
     trial_emails = 0
     te_res = await db.execute(
         select(User).where(
@@ -139,7 +139,7 @@ async def streak_reminders(
     )
     for u in te_res.scalars().all():
         ts = trial_status(u)
-        if ts.get("day") == 6 and not ts.get("subscription_active"):
+        if ts.get("day") == TRIAL_DAYS and not ts.get("subscription_active"):
             await send_trial_ending_email(u.email, u.name)
             u.trial_ending_sent = True
             trial_emails += 1

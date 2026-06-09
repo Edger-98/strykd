@@ -227,7 +227,7 @@ export default function OnboardingWizard({ onSubmit, busy, error, mode = 'signup
                 <div style={St.nav}>
                   {step > 0 && <button className="pill pill-outline pill-sm" onClick={back}><ArrowLeft size={15} /> Back</button>}
                   <button className="pill pill-dark" onClick={() => advance()} style={{ marginLeft: 'auto' }}>
-                    {isLast ? (addMode ? 'Create this goal' : 'Start your free week') : 'Continue'} <ArrowRight size={17} />
+                    {isLast ? (addMode ? 'Create this goal' : 'Start your free trial') : 'Continue'} <ArrowRight size={17} />
                   </button>
                 </div>
               )}
@@ -237,7 +237,7 @@ export default function OnboardingWizard({ onSubmit, busy, error, mode = 'signup
                   <button className="pill pill-outline pill-sm" onClick={back}><ArrowLeft size={15} /> Back</button>
                 </div>
               )}
-              {isLast && !addMode && <p style={St.trial}>No charge for 7 days. Cancel anytime.</p>}
+              {isLast && !addMode && <p style={St.trial}>No charge for 3 days. Cancel anytime.</p>}
               {cur.text && <p style={St.hint}>Press Cmd/Ctrl + Enter to continue</p>}
             </motion.div>
           </AnimatePresence>
