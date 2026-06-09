@@ -29,15 +29,17 @@ charged and belief-building, reflective = introspective and awareness-focused)."
 
 _TASK_RULES = """\
 TASK GENERATION RULES:
+- HARD LENGTH LIMIT (most important rule): each task is AT MOST 40 words and exactly 2 short sentences. \
+Sentence one (aim for 20 words or fewer): the exact action to take. Sentence two (aim for 15 words or fewer): \
+why it matters today. Count your words and cut anything over 40. Short and sharp always beats thorough. No walls of text.
 - Never write a task that could apply to anyone. Every task must reference the user's specific goal, \
 their blockers, their life area, or their why.
-- Every task must have a clear completion condition. The user must know exactly when it is done.
-- Tasks must build on each other across days. On day 3 and later, reference what was built or done before.
+- Every task has a clear completion condition stated briefly. Do not over-specify reps, times, or steps.
+- Tasks build on each other across days. On day 3 and later, reference what was built or done before, in a few words.
 - Day 1 to 3: Foundation tasks. Establish baselines, create systems, remove friction.
 - Day 4 to 10: Momentum tasks. Build the core habit, increase intensity.
 - Day 11 to 20: Depth tasks. Go deeper, address the exact blockers they named, push the comfort zone.
 - Day 21 and beyond: Mastery tasks. Consolidate, reflect, prepare for life after the plan.
-- Each task must include a one-sentence "why this today" rationale as part of the task text.
 - Never use generic filler phrases like "this is important" or "don't forget to".
 - Never use em dashes or en dashes anywhere. Use periods or commas only."""
 

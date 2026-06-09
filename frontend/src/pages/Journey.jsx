@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   Menu, X, MapPin, Check, Sparkles, TrendingUp, Calendar, ChevronDown, Plus, Flame,
-  Pause, Play, Eye, EyeOff, Loader2, Film, Trash2, Lock,
+  Pause, Play, Eye, EyeOff, Loader2, Film, Trash2,
 } from 'lucide-react'
 import DashSidebar, { SIDEBAR_W } from '../components/DashSidebar'
 import AddGoalModal from '../components/AddGoalModal'
@@ -243,31 +243,19 @@ function DayDrawer({ day, onClose }) {
                 </a>
               </>
             )}
-            {day.is_future ? (
-              <div style={S.lockedBox}>
-                <Lock size={22} color="var(--d-text-muted)" />
-                <p style={{ fontWeight: 700, marginTop: 12 }}>Day {day.day_number} tasks unlock on {fmtDate(day.date)}</p>
-                <p style={{ color: 'var(--d-text-muted)', fontSize: '0.86rem', marginTop: 6, lineHeight: 1.5 }}>
-                  {day.tasks_total > 0 ? `${day.tasks_total} tasks are planned. ` : ''}Stay focused on today. The plan reveals itself one day at a time.
-                </p>
-              </div>
-            ) : (
-              <>
-                <p style={S.drawerLabel}>Your tasks</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {day.tasks.length ? day.tasks.map((t, i) => (
-                    <div key={i} style={S.drawerTask}>
-                      <span style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0, marginTop: 1, display: 'grid', placeItems: 'center',
-                        border: `2px solid ${t.completed ? 'var(--red)' : 'var(--d-line)'}`, background: t.completed ? 'var(--red)' : 'transparent' }}>
-                        {t.completed && <Check size={11} color="#fff" strokeWidth={3} />}
-                      </span>
-                      <span style={{ fontSize: '0.9rem', lineHeight: 1.45, color: t.completed ? 'var(--d-text-muted)' : 'var(--d-text)',
-                        textDecoration: t.completed ? 'line-through' : 'none' }}>{t.content}</span>
-                    </div>
-                  )) : <p style={{ color: 'var(--d-text-muted)', fontSize: '0.9rem' }}>No tasks for this day.</p>}
+            <p style={S.drawerLabel}>{day.is_future ? "What's planned" : 'Your tasks'}</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {day.tasks.length ? day.tasks.map((t, i) => (
+                <div key={i} style={S.drawerTask}>
+                  <span style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0, marginTop: 1, display: 'grid', placeItems: 'center',
+                    border: `2px solid ${t.completed ? 'var(--red)' : 'var(--d-line)'}`, background: t.completed ? 'var(--red)' : 'transparent' }}>
+                    {t.completed && <Check size={11} color="#fff" strokeWidth={3} />}
+                  </span>
+                  <span style={{ fontSize: '0.9rem', lineHeight: 1.45, color: t.completed ? 'var(--d-text-muted)' : 'var(--d-text)',
+                    textDecoration: t.completed ? 'line-through' : 'none' }}>{t.content}</span>
                 </div>
-              </>
-            )}
+              )) : <p style={{ color: 'var(--d-text-muted)', fontSize: '0.9rem' }}>No tasks for this day.</p>}
+            </div>
             {day.signal && (
               <>
                 <p style={{ ...S.drawerLabel, marginTop: 28 }}><TrendingUp size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Signal wall</p>
