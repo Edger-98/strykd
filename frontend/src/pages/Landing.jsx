@@ -212,6 +212,8 @@ export default function Landing() {
         <div className="container" style={S.footer}>
           <span style={{ fontWeight: 800, letterSpacing: '0.1em' }}>STRYKD</span>
           <span style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
+            <a href="/privacy" style={S.footLink}>Privacy</a>
+            <a href="/terms" style={S.footLink}>Terms</a>
             <a href="/contact" style={S.footLink}>Contact</a>
             <span style={{ color: 'var(--gray-light)', fontSize: '0.85rem' }}>
               © {new Date().getFullYear()} Strykd · AI accountability that ships.
