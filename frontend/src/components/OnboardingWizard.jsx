@@ -3,11 +3,12 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowLeft, ArrowRight, Briefcase, Dumbbell, Rocket, Palette, Sprout,
   Sunrise, Moon, Globe, Lock, X, Heart, DollarSign, GraduationCap, Plane,
-  Brain, Lightbulb, Sun, Pencil,
+  Brain, Lightbulb, Sun, Pencil, Target, Infinity, Loader2,
 } from 'lucide-react'
 import { stepVariants } from '../motion'
 import GoalChat from './GoalChat'
 import { LIFE_AREAS, RECOMMENDED_GOALS } from '../lifeAreas'
+import { api } from '../api'
 
 const STEP_BG = {
   goals: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1440&q=80',
@@ -35,8 +36,10 @@ export default function OnboardingWizard({ onSubmit, busy, error, mode = 'signup
   const [form, setForm] = useState(initialForm || {
     goals: '', life_area: '', why_now: '', past_blockers: '',
     duration_days: 7, hours_per_day: 2, daily_rhythm: '',
-    aesthetic: '', page_public: true,
+    aesthetic: '', page_public: true, goal_type: 'sprint', ai_recommended_days: null,
   })
+  const [feasBusy, setFeasBusy] = useState(false)
+  const [feas, setFeas] = useState(null)  // { recommended_days, message }
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const addMode = mode === 'add'
 
@@ -93,15 +96,57 @@ export default function OnboardingWizard({ onSubmit, busy, error, mode = 'signup
       render: () => <textarea autoFocus className="field" style={St.textarea}
         placeholder="e.g. I start strong then get paralyzed by perfectionism" value={form.past_blockers} onChange={e => set('past_blockers', e.target.value)} /> },
     { key: 'cadence', q: 'How much can you commit?', sub: 'Your plan is sized to fit. No impossible schedules.',
-      valid: () => form.duration_days >= 1 && form.hours_per_day >= 1,
-      render: () => (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <Field label="OVER HOW MANY DAYS?"><input autoFocus type="number" min={1} max={365} className="field"
-            value={form.duration_days} onChange={e => set('duration_days', Number(e.target.value))} /></Field>
-          <Field label="FOCUSED HOURS PER DAY?"><input type="number" min={1} max={16} className="field"
-            value={form.hours_per_day} onChange={e => set('hours_per_day', Number(e.target.value))} /></Field>
-        </div>
-      ) },
+      valid: () => form.hours_per_day >= 1, custom: true,
+      render: () => {
+        const lifestyle = form.goal_type === 'lifestyle'
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* timed vs ongoing toggle */}
+            <div style={{ display: 'flex', gap: 12 }}>
+              {[{ v: 'sprint', Icon: Target, label: 'Timed goal', desc: 'Has a finish line' },
+                { v: 'lifestyle', Icon: Infinity, label: 'Ongoing habit', desc: 'Runs indefinitely' }].map(o => (
+                <Choice key={o.v} active={form.goal_type === o.v} onClick={() => { set('goal_type', o.v); setFeas(null) }}
+                  style={{ flex: 1, flexDirection: 'column', alignItems: 'center', gap: 8, padding: '1.4rem 1rem', textAlign: 'center' }}>
+                  <o.Icon size={26} color={form.goal_type === o.v ? 'var(--red)' : 'var(--gray-text)'} />
+                  <span style={{ fontWeight: 700 }}>{o.label}</span>
+                  <span style={{ fontSize: '0.76rem', color: 'var(--gray-text)' }}>{o.desc}</span>
+                </Choice>
+              ))}
+            </div>
+
+            {lifestyle ? (
+              <p style={{ color: 'var(--gray-text)', fontSize: '0.92rem', lineHeight: 1.55 }}>
+                Perfect for habits like sobriety, daily exercise, meditation, journaling, or a reading habit.
+                We generate fresh tasks every day and your streak becomes the score.
+              </p>
+            ) : (
+              <Field label="OVER HOW MANY DAYS?"><input type="number" min={1} max={365} className="field"
+                value={form.duration_days} onChange={e => { set('duration_days', Number(e.target.value)); setFeas(null) }} /></Field>
+            )}
+
+            <Field label="FOCUSED HOURS PER DAY?"><input type="number" min={1} max={16} className="field"
+              value={form.hours_per_day} onChange={e => set('hours_per_day', Number(e.target.value))} /></Field>
+
+            {feas && (
+              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={St.feasBox}>
+                <p style={{ lineHeight: 1.6 }}>{feas.message}</p>
+                <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
+                  <button className="pill pill-dark pill-sm" onClick={acceptRecommendation}>
+                    Extend to {feas.recommended_days} days
+                  </button>
+                  <button className="pill pill-outline pill-sm" onClick={keepTimeline}>
+                    Keep my {form.duration_days} days
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            <button className="pill pill-dark" onClick={cadenceContinue} disabled={feasBusy} style={{ alignSelf: 'flex-start', marginTop: 4 }}>
+              {feasBusy ? <Loader2 size={16} className="spin-icon" /> : <>Continue <ArrowRight size={16} /></>}
+            </button>
+          </div>
+        )
+      } },
     { key: 'daily_rhythm', q: 'When are you sharpest?', sub: 'The heaviest work goes into your peak window.',
       valid: () => !!form.daily_rhythm,
       render: () => (
@@ -178,6 +223,28 @@ export default function OnboardingWizard({ onSubmit, busy, error, mode = 'signup
   const pickGoal = (area, goal) => {
     setForm(f => ({ ...f, life_area: area, goals: goal }))
     setLocalErr(''); setDir(1); setStep(s => s + 1)
+  }
+  const goNext = () => { setLocalErr(''); setFeas(null); setDir(1); setStep(s => s + 1) }
+  // Cadence step: ongoing habits skip the timeline check; timed goals get a feasibility check.
+  const cadenceContinue = async () => {
+    if (form.goal_type === 'lifestyle') { goNext(); return }
+    if (form.duration_days < 1 || form.hours_per_day < 1) { setLocalErr('Please complete this step.'); return }
+    setFeasBusy(true); setLocalErr('')
+    try {
+      const r = await api.validateGoal({ goal: form.goals, duration_days: Number(form.duration_days), goal_type: 'sprint' })
+      if (r && r.feasible === false && r.message) { setFeas(r); return }
+      if (r?.recommended_days) setForm(f => ({ ...f, ai_recommended_days: r.recommended_days }))
+      goNext()
+    } catch (e) { goNext() }  // never block onboarding on a validation failure
+    finally { setFeasBusy(false) }
+  }
+  const acceptRecommendation = () => {
+    setForm(f => ({ ...f, duration_days: feas.recommended_days, ai_recommended_days: feas.recommended_days }))
+    goNext()
+  }
+  const keepTimeline = () => {
+    setForm(f => ({ ...f, ai_recommended_days: feas.recommended_days }))
+    goNext()
   }
   const onKey = e => {
     if (cur.chat || cur.custom) return  // these steps manage their own input
@@ -294,4 +361,6 @@ const St = {
     background: 'var(--white)', color: 'var(--ink)', fontWeight: 600, fontSize: '0.95rem', cursor: 'pointer' },
   recOwn: { display: 'inline-flex', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginTop: 2,
     padding: '10px 4px', background: 'none', border: 'none', color: 'var(--blue)', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer' },
+  feasBox: { background: 'rgba(255,45,45,0.05)', border: '1px solid rgba(255,45,45,0.3)', borderRadius: 14, padding: 16,
+    color: 'var(--ink)', fontSize: '0.95rem' },
 }

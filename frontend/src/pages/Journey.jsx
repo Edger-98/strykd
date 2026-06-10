@@ -108,7 +108,7 @@ function GoalCard({ goal, index, expanded, onToggle, onPickDay, reload }) {
           </p>
           <h2 className="display" style={S.goalTitle}>{goal.description}</h2>
           <p style={S.goalMeta}>
-            Day {p.day} of {p.total_days}
+            {goal.goal_type === 'lifestyle' ? `Day ${p.day} · active` : `Day ${p.day} of ${p.total_days}`}
             <span style={{ color: 'var(--d-text-muted)' }}> · </span>
             <Flame size={12} color="var(--red)" style={{ verticalAlign: -1 }} /> {goal.streak_days} day streak
           </p>

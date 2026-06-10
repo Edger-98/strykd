@@ -110,10 +110,12 @@ export const api = {
 
   // Goal clarification chat: returns {type:'question'|'refined', message, refined_goal?}
   clarify: (conversation, life_area) => req('POST', '/onboarding/clarify', { conversation, life_area }),
+  // Goal feasibility check: returns {feasible, recommended_days, message}
+  validateGoal: body => req('POST', '/onboarding/validate-goal', body),
 
   // Returns the raw Response for SSE streaming of the plan generation stages
   onboardStream: form => {
-    const qs = new URLSearchParams({
+    const params = {
       goals: form.goals,
       duration_days: form.duration_days,
       aesthetic: form.aesthetic,
@@ -123,8 +125,10 @@ export const api = {
       hours_per_day: form.hours_per_day,
       daily_rhythm: form.daily_rhythm,
       page_public: form.page_public,
-    }).toString()
-    return fetch(`${API}/onboarding/stream?${qs}`, {
+      goal_type: form.goal_type || 'sprint',
+    }
+    if (form.ai_recommended_days) params.ai_recommended_days = form.ai_recommended_days
+    return fetch(`${API}/onboarding/stream?${new URLSearchParams(params).toString()}`, {
       headers: { Authorization: `Bearer ${getToken()}` },
     })
   },

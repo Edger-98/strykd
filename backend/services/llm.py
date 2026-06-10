@@ -134,6 +134,37 @@ async def generate_itinerary(name: str, tasks: list[str]) -> dict:
     return await _json_call(system, user, 2000)
 
 
+async def assess_feasibility(goal: str, duration_days: int, goal_type: str = "sprint") -> dict:
+    """Judge whether the chosen timeline is realistic for the goal.
+
+    Returns {"feasible": bool, "recommended_days": int, "message": str}.
+    Lifestyle (ongoing) goals are always feasible (no finish line)."""
+    if goal_type == "lifestyle":
+        return {"feasible": True, "recommended_days": duration_days, "message": ""}
+    system = (
+        "You are a realistic goal-planning coach. Given a goal and a chosen number of days, judge whether "
+        "that timeline is realistic to achieve the goal meaningfully. Return ONLY JSON: "
+        '{"feasible": true|false, "recommended_days": <integer>, "message": "<one short paragraph, or empty string>"}. '
+        "If the timeline is reasonable, feasible is true, recommended_days equals the chosen days, message is empty. "
+        "If it is too short to achieve the goal meaningfully, feasible is false, recommended_days is a realistic "
+        "number of days, and message follows EXACTLY this shape: "
+        '"Your goal of GOAL typically takes TIME to achieve meaningfully. With N days I can build you a strong '
+        'foundation, but you may want to consider extending to M for full results. Would you like to adjust?" '
+        "Replace GOAL, TIME, N, and M naturally. Never use em dashes; use commas or periods."
+    )
+    user = f"Goal: {goal}\nChosen timeline: {duration_days} days."
+    data = await _json_call(system, user, 400)
+    try:
+        rec = int(data.get("recommended_days"))
+    except (TypeError, ValueError):
+        rec = duration_days
+    return {
+        "feasible": bool(data.get("feasible", True)),
+        "recommended_days": rec,
+        "message": _strip_em_dashes(str(data.get("message", ""))),
+    }
+
+
 async def clarify_goal(conversation: list[dict], life_area: str | None = None) -> dict:
     """One turn of the goal-clarification chat.
 
@@ -221,8 +252,8 @@ async def _gen_tasks(ctx: dict, analysis: dict, chapters: list, n_days: int, tim
         f"{_COACH_IDENTITY}\n\n{_TASK_RULES}\n\n"
         'Return ONLY JSON: {"daily_tasks": [{"day": 1, "tasks": '
         '[{"content": "specific task with its one-sentence \'why this today\' rationale", '
-        '"voice_style": "direct|motivational|reflective"}]}]}. '
-        "Each day has exactly 5 tasks. No preamble."
+        '"voice_style": "direct|motivational|reflective", "duration": 15}]}]}. '
+        "duration is the estimated minutes (15, 30, 45, or 60). No preamble."
     )
     total = ctx["duration_days"]
     user = (
@@ -231,17 +262,20 @@ async def _gen_tasks(ctx: dict, analysis: dict, chapters: list, n_days: int, tim
         f"=== CHAPTER MAP ===\n{json.dumps(chapters)}\n\n"
         "=== REQUIREMENTS ===\n"
         f"- This is a {total}-day plan. Generate ONLY the first {n_days} days now (day 1 through day {n_days}).\n"
-        f"- daily_tasks: exactly {n_days} entries, 5 tasks each\n"
+        f"- daily_tasks: exactly {n_days} entries.\n"
+        f"{_duration_rules(ctx)}\n"
         "- Every task references THIS goal, their blockers, their life area, or their why. Nothing generic.\n"
         "- Every task states a clear completion condition and ends with a one-sentence 'why this today'.\n"
         "- These are the opening days: foundation work that later days build on. Establish baselines, create systems, remove friction.\n"
         "- From day 3 on, build explicitly on what earlier days established.\n"
-        f"- Respect their {ctx['hours_per_day'] if ctx['hours_per_day'] is not None else 'available'} hours/day. Do not over-schedule.\n"
         f"- Schedule the heaviest tasks in their {ctx['daily_rhythm'] or 'peak'} window.\n"
         "- Return only the JSON object."
     )
     data = await _json_call(system, user, 8000, timeout=timeout)
-    return data.get("daily_tasks", [])
+    days = data.get("daily_tasks", [])
+    for entry in days:
+        entry["tasks"] = _norm_durations(entry.get("tasks") or [])
+    return days
 
 
 def _fallback_day1(analysis: dict) -> list:
@@ -262,24 +296,62 @@ def _phase_for(day: int, total: int) -> str:
     return "Mastery: consolidate, reflect, prepare for life after the plan."
 
 
+def _hours_plan(hours_per_day) -> tuple[int, str]:
+    """Total focused minutes for the day + a target task-count band."""
+    h = hours_per_day if (hours_per_day and hours_per_day > 0) else 2
+    total = h * 60
+    if h <= 1:
+        count = "2 to 3"
+    elif h <= 2:
+        count = "3 to 4"
+    else:
+        count = "4 to 5"
+    return total, count
+
+
+_DURATIONS = [15, 30, 45, 60]
+
+
+def _norm_durations(tasks: list) -> list:
+    """Snap each task's duration to one of 15/30/45/60 minutes; default 30."""
+    for t in tasks:
+        try:
+            d = int(t.get("duration"))
+        except (TypeError, ValueError):
+            d = 30
+        t["duration"] = min(_DURATIONS, key=lambda x: abs(x - d))
+    return tasks
+
+
+def _duration_rules(ctx: dict) -> str:
+    total_min, count = _hours_plan(ctx.get("hours_per_day"))
+    h = ctx.get("hours_per_day") or 2
+    return (
+        f"- TIME BUDGET: the user has {h} hour(s) = {total_min} focused minutes today.\n"
+        f"- Generate {count} tasks. Give each a duration of 15, 30, 45, or 60 minutes.\n"
+        f"- The durations must sum to AT MOST {total_min} minutes. With little time, fewer shorter "
+        "tasks; with more time, fewer deeper tasks. Never over-schedule the day."
+    )
+
+
 async def plan_day(ctx: dict, day_number: int, timeout: float = 55.0) -> dict:
-    """Generate a single day's 5 tasks. Small + fast so many days run concurrently."""
+    """Generate a single day's tasks, sized to the user's hours. Fast (runs concurrently)."""
     total = ctx["duration_days"]
     system = (
         f"{_COACH_IDENTITY}\n\n{_TASK_RULES}\n\n"
         'Return ONLY JSON: {"tasks": [{"content": "task with its one-sentence \'why this today\'", '
-        '"voice_style": "direct|motivational|reflective"}]} with exactly 5 tasks. No preamble.'
+        '"voice_style": "direct|motivational|reflective", "duration": 15}]}. '
+        "duration is the estimated minutes (15, 30, 45, or 60). No preamble."
     )
     user = (
         f"=== CONTEXT ===\n{_ctx_block(ctx)}\n\n"
         f"=== DAY ===\nGenerate day {day_number} of {total}. Phase: {_phase_for(day_number, total)}\n"
-        "- Exactly 5 tasks for THIS day, specific to the goal, blockers, life area, or why.\n"
-        "- Each task has a clear completion condition and ends with a one-sentence 'why this today'.\n"
-        f"- Respect their {ctx['hours_per_day'] if ctx['hours_per_day'] is not None else 'available'} hours/day.\n"
+        f"{_duration_rules(ctx)}\n"
+        "- Each task is specific to the goal, blockers, life area, or why, with a clear completion condition.\n"
         "- Return only the JSON object."
     )
     data = await _json_call(system, user, 2000, timeout=timeout)
-    return {"day": day_number, "tasks": (data.get("tasks") or [])[:5]}
+    return {"day": day_number, "tasks": _norm_durations(data.get("tasks") or [])[:6]}
 
 
 async def plan_task_range(ctx: dict, start_day: int, end_day: int) -> list:
@@ -568,11 +640,11 @@ was completed, and escalate appropriately for where they are in the plan.
 
 Return ONLY a single valid JSON object with this schema:
 {{
-  "tasks": ["<specific task for THIS goal with its one-sentence 'why this today' rationale>", "...", "...", "...", "..."],
+  "tasks": [{{"content": "<specific task for THIS goal with its one-sentence 'why this today'>", "duration": 15}}],
   "daily_headline": "<1 cinematic sentence that fits where they are in the plan>",
   "signal_wall_entry": "<3-sentence narrative dispatch reflecting yesterday's effort and today's focus>"
 }}
-- "tasks" must contain exactly 5 strings.
+- Each task's "duration" is the estimated minutes: 15, 30, 45, or 60.
 No markdown fences, no preamble. Start with {{ and end with }}."""
 
 
@@ -627,11 +699,10 @@ async def generate_nightly(
                     "=== CONTEXT ===\n"
                     + "\n".join(context_lines)
                     + "\n\n=== REQUIREMENTS ===\n"
-                    f"- Exactly 5 tasks, each specific to THIS goal with a clear completion condition.\n"
+                    + _duration_rules({"hours_per_day": hours_per_day}) + "\n"
+                    f"- Each task is specific to THIS goal with a clear completion condition and a one-sentence 'why this today'.\n"
                     f"- Build on what they completed yesterday. Do not repeat finished work.\n"
                     f"- Match the day {day_number} phase above and escalate from yesterday.\n"
-                    f"- Each task ends with a one-sentence 'why this today'.\n"
-                    f"- Respect their {hours_per_day if hours_per_day is not None else 'available'} hours/day.\n"
                     f"- Return only the JSON object."
                 ),
             }

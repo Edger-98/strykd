@@ -101,12 +101,15 @@ async def _goal_journey(goal: Goal, db: AsyncSession, today: date) -> dict:
         })
 
     pct = round((total_completed / total_tasks) * 100) if total_tasks else 0
+    lifestyle = goal.goal_type == "lifestyle"
+    prog_day = max(today_day_number, 1) if lifestyle else min(max(today_day_number, 1), total_days)
     return {
         "id": str(goal.id), "description": goal.description, "life_area": goal.life_area,
         "duration_days": total_days, "start_date": _d(goal.start_date), "end_date": _d(goal.end_date),
+        "goal_type": goal.goal_type,
         "status": goal.status, "page_public": goal.page_public,
         "streak_days": goal.streak_days, "projected_outcome": goal.projected_outcome,
-        "progress": {"day": min(max(today_day_number, 1), total_days), "total_days": total_days,
+        "progress": {"day": prog_day, "total_days": None if lifestyle else total_days,
                      "pct": pct, "tasks_completed": total_completed, "tasks_total": total_tasks,
                      "current_week": current_week_index},
         "weeks": weeks,

@@ -19,8 +19,8 @@ from models.theme import Theme
 from models.user import User
 from services.cache import bust_public_page
 from services.llm import (
-    assemble_plan, clarify_goal, day1_contents, generate_plan, plan_chapters,
-    plan_inputs, plan_mission, plan_signal_day1, plan_task_range, plan_theme,
+    assemble_plan, assess_feasibility, clarify_goal, day1_contents, generate_plan,
+    plan_chapters, plan_inputs, plan_mission, plan_signal_day1, plan_task_range, plan_theme,
 )
 
 logger = logging.getLogger("strykd.onboarding")
@@ -56,6 +56,21 @@ async def clarify(
         raise HTTPException(status_code=502, detail=f"Clarification failed: {exc}")
 
 
+class FeasibilityRequest(BaseModel):
+    goal: str
+    duration_days: int
+    goal_type: str = "sprint"
+
+
+@router.post("/validate-goal")
+async def validate_goal(body: FeasibilityRequest, current_user: User = Depends(get_current_user)):
+    """Check if the chosen duration is realistic for the goal. Never blocks onboarding."""
+    try:
+        return await assess_feasibility(body.goal, body.duration_days, body.goal_type)
+    except Exception:
+        return {"feasible": True, "recommended_days": body.duration_days, "message": ""}
+
+
 class OnboardingRequest(BaseModel):
     goals: str
     duration_days: int
@@ -66,6 +81,8 @@ class OnboardingRequest(BaseModel):
     hours_per_day: int
     daily_rhythm: str  # morning | evening
     page_public: bool = True  # public or private page
+    goal_type: str = "sprint"  # sprint (finite) | lifestyle (ongoing habit)
+    ai_recommended_days: int | None = None
 
 
 class OnboardingResponse(BaseModel):
@@ -77,7 +94,8 @@ class OnboardingResponse(BaseModel):
 async def _persist_plan(db: AsyncSession, user: User, body: OnboardingRequest, plan: dict) -> Goal:
     """Persist a generated plan: goal, daily tasks, theme (first goal), Day 1 signal."""
     today = date.today()
-    end_date = today + timedelta(days=body.duration_days - 1)
+    lifestyle = body.goal_type == "lifestyle"
+    end_date = None if lifestyle else today + timedelta(days=body.duration_days - 1)
 
     # Honor the public/private page toggle
     user.page_public = body.page_public
@@ -100,6 +118,8 @@ async def _persist_plan(db: AsyncSession, user: User, body: OnboardingRequest, p
         daily_rhythm=body.daily_rhythm,
         chapter_titles=plan.get("chapter_titles", []),
         streak_days=0,
+        goal_type=body.goal_type,
+        ai_recommended_days=body.ai_recommended_days,
     )
     db.add(goal)
     await db.flush()  # populate goal.id before FK refs
@@ -109,12 +129,14 @@ async def _persist_plan(db: AsyncSession, user: User, body: OnboardingRequest, p
         day_num = int(day_entry["day"])
         task_date = today + timedelta(days=day_num - 1)
         for task in day_entry.get("tasks", []):
+            dur = task.get("duration")
             db.add(DailyTask(
                 goal_id=goal.id,
                 user_id=user.id,
                 task_date=task_date,
                 content=task["content"],
                 voice_style=task.get("voice_style", "direct"),
+                duration_minutes=int(dur) if isinstance(dur, (int, float)) else None,
             ))
         if day_num == 1:
             task_count_day1 = len(day_entry.get("tasks", []))
@@ -209,9 +231,11 @@ async def _generate_remaining_days(goal_id, ctx: dict, start_day: int, end_day: 
                     if exists:
                         continue
                     for t in entry.get("tasks", []):
+                        dur = t.get("duration")
                         db.add(DailyTask(
                             goal_id=goal_id, user_id=goal.user_id, task_date=td,
                             content=t["content"], voice_style=t.get("voice_style", "direct"),
+                            duration_minutes=int(dur) if isinstance(dur, (int, float)) else None,
                         ))
                 await db.commit()
                 d = chunk_end + 1
@@ -231,6 +255,8 @@ async def onboard_stream(
     hours_per_day: int = Query(...),
     daily_rhythm: str = Query(...),
     page_public: bool = Query(True),
+    goal_type: str = Query("sprint"),
+    ai_recommended_days: int | None = Query(None),
     current_user: User = Depends(get_current_user),
 ):
     """Generate the plan stage by stage, streaming an SSE event as each completes."""
@@ -241,6 +267,7 @@ async def onboard_stream(
         goals=goals, duration_days=duration_days, aesthetic=aesthetic, life_area=life_area,
         why_now=why_now, past_blockers=past_blockers, hours_per_day=hours_per_day,
         daily_rhythm=daily_rhythm, page_public=page_public,
+        goal_type=goal_type, ai_recommended_days=ai_recommended_days,
     )
     user_id = current_user.id
     slug = current_user.slug
@@ -286,9 +313,11 @@ async def onboard_stream(
                 goal_id = goal.id
 
             # Remaining days generate in the background; user is already done.
-            if duration_days > seed_end:
+            # Lifestyle goals have no end: seed a ~30-day runway, the nightly cron rolls forever.
+            fill_end = min(duration_days, seed_end + 23) if goal_type == "lifestyle" else duration_days
+            if fill_end > seed_end:
                 t = asyncio.ensure_future(
-                    _generate_remaining_days(goal_id, ctx, seed_end + 1, duration_days, date.today(), slug)
+                    _generate_remaining_days(goal_id, ctx, seed_end + 1, fill_end, date.today(), slug)
                 )
                 _BG_TASKS.add(t)
                 t.add_done_callback(_BG_TASKS.discard)

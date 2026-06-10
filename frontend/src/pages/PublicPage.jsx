@@ -63,7 +63,7 @@ export default function PublicPage() {
             </motion.p>
             {primary.progress && (
               <motion.span style={S.projPill} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.55 }}>
-                Day {primary.progress.day} of {primary.progress.total_days}
+                {primary.goal_type === 'lifestyle' ? `Day ${primary.progress.day} · active` : `Day ${primary.progress.day} of ${primary.progress.total_days}`}
               </motion.span>
             )}
             <motion.div style={S.projScroll} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.9 }}>
@@ -159,7 +159,7 @@ function GoalSection({ goal, t, first, onPickDay }) {
           <div style={{ flex: '1 1 280px' }}>
             <h2 className="display" style={{ fontSize: '1.6rem', lineHeight: 1.25, marginBottom: 10 }}>{goal.description}</h2>
             <span style={{ fontSize: '0.78rem', color: 'var(--gray-light)', letterSpacing: '0.05em', fontWeight: 600 }}>
-              DAY {p.day} OF {p.total_days} · {goal.streak_days} DAY STREAK
+              {goal.goal_type === 'lifestyle' ? `DAY ${p.day} ACTIVE` : `DAY ${p.day} OF ${p.total_days}`} · {goal.streak_days} DAY STREAK
             </span>
           </div>
           <ProgressArc pct={p.pct} accent={t.accent} />

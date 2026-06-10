@@ -34,6 +34,7 @@ def _task_dict(t: DailyTask, detailed: bool = False) -> dict:
         "sort_order": t.sort_order,
     }
     out["proof_url"] = t.proof_url
+    out["duration_minutes"] = t.duration_minutes
     if detailed:
         out["goal_id"] = str(t.goal_id) if t.goal_id else None
         out["completed_at"] = t.completed_at.isoformat() if t.completed_at else None
@@ -55,9 +56,19 @@ async def build_grid(goal: Goal, db: AsyncSession, today: date) -> list[dict]:
     sw_res = await db.execute(select(SignalWall).where(SignalWall.goal_id == goal.id))
     sig_by_date = {sw.entry_date: sw for sw in sw_res.scalars().all()}
 
+    # Lifestyle goals have no end: show a rolling last-90-day window. Sprint goals
+    # show the full plan from start to end.
+    if goal.goal_type == "lifestyle":
+        win_start = max(goal.start_date, today - timedelta(days=89))
+        win_end = today
+    else:
+        win_start = goal.start_date
+        win_end = goal.start_date + timedelta(days=goal.duration_days - 1)
+    span = (win_end - win_start).days + 1
+
     days: list[dict] = []
-    for i in range(goal.duration_days):
-        d = goal.start_date + timedelta(days=i)
+    for i in range(span):
+        d = win_start + timedelta(days=i)
         tasks = by_date.get(d, [])
         total = len(tasks)
         done = sum(1 for t in tasks if t.completed)
@@ -65,7 +76,7 @@ async def build_grid(goal: Goal, db: AsyncSession, today: date) -> list[dict]:
         sw = sig_by_date.get(d)
         days.append({
             "date": _d(d),
-            "day_number": i + 1,
+            "day_number": (d - goal.start_date).days + 1,
             "tasks_total": total,
             "tasks_completed": done,
             "pct": round(done / total * 100) if total else 0,
@@ -77,7 +88,8 @@ async def build_grid(goal: Goal, db: AsyncSession, today: date) -> list[dict]:
             "is_video": bool(proof and proof.lower().endswith(".mp4")),
             "tasks": [
                 {"content": t.content, "completed": t.completed,
-                 "voice_style": t.voice_style, "proof_url": t.proof_url}
+                 "voice_style": t.voice_style, "proof_url": t.proof_url,
+                 "duration_minutes": t.duration_minutes}
                 for t in tasks
             ],
             "signal": {"ai_summary": sw.ai_summary, "tasks_completed": sw.tasks_completed,
@@ -101,7 +113,10 @@ async def _goal_section(goal: Goal, db: AsyncSession, today: date, detailed: boo
         select(func.count()).select_from(DailyTask).where(DailyTask.goal_id == goal.id, DailyTask.completed.is_(True))
     ) or 0
     elapsed = (today - goal.start_date).days
-    day = min(max(elapsed + 1, 1), goal.duration_days)
+    lifestyle = goal.goal_type == "lifestyle"
+    # Lifestyle: "day" is total days active, no fixed total or percent of a finite plan.
+    day = max(elapsed + 1, 1) if lifestyle else min(max(elapsed + 1, 1), goal.duration_days)
+    total_days = None if lifestyle else goal.duration_days
     pct = round(done / total * 100) if total else 0
 
     # Proof gallery: distinct uploads for this goal, newest first
@@ -131,12 +146,13 @@ async def _goal_section(goal: Goal, db: AsyncSession, today: date, detailed: boo
         "duration_days": goal.duration_days,
         "start_date": _d(goal.start_date),
         "end_date": _d(goal.end_date),
+        "goal_type": goal.goal_type,
         "status": goal.status,
         "page_public": goal.page_public,
         "streak_days": goal.streak_days,
         "projected_outcome": goal.projected_outcome or "",
         "chapter_titles": goal.chapter_titles or [],
-        "progress": {"day": day, "total_days": goal.duration_days, "pct": pct,
+        "progress": {"day": day, "total_days": total_days, "pct": pct,
                      "tasks_completed": done, "tasks_total": total},
         "today_tasks": [_task_dict(t, detailed) for t in today_tasks],
         "proofs": proofs,

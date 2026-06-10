@@ -42,8 +42,8 @@ async def nightly(
     touched_users: set = set()
 
     for goal in goals:
-        # Skip goals whose plan window has already ended
-        if tomorrow > goal.end_date:
+        # Sprint goals stop at end_date; lifestyle goals (no end_date) run forever.
+        if goal.end_date is not None and tomorrow > goal.end_date:
             continue
         # Don't double-generate if tomorrow already has tasks
         existing = await db.scalar(
@@ -77,10 +77,17 @@ async def nightly(
             errors += 1
             continue
 
-        for task_str in (content.get("tasks") or [])[:5]:
+        for task in (content.get("tasks") or [])[:6]:
+            if isinstance(task, dict):
+                text, dur = task.get("content", ""), task.get("duration")
+            else:
+                text, dur = str(task), None
+            if not str(text).strip():
+                continue
             db.add(DailyTask(
                 goal_id=goal.id, user_id=goal.user_id, task_date=tomorrow,
-                content=str(task_str), voice_style="direct",
+                content=str(text), voice_style="direct",
+                duration_minutes=int(dur) if isinstance(dur, (int, float)) else None,
             ))
 
         db.add(SignalWall(

@@ -166,6 +166,12 @@ function Row({ task, last, busy, editing, draft, setDraft, onToggle, onBeginEdit
         <Trash2 size={15} />
       </button>
 
+      {task.duration_minutes ? (
+        <span style={{ flexShrink: 0, fontSize: '0.7rem', color: 'var(--d-text-muted)', whiteSpace: 'nowrap' }}>
+          ~{task.duration_minutes} min
+        </span>
+      ) : null}
+
       <span style={{ flexShrink: 0, fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.1em',
         color: v.color, border: `1px solid ${v.color}`, borderRadius: 5, padding: '2px 6px', opacity: 0.85 }}>
         {v.label}

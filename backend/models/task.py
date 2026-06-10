@@ -18,6 +18,7 @@ class DailyTask(Base):
     task_date: Mapped[date] = mapped_column(Date, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     voice_style: Mapped[str] = mapped_column(String, default="direct")  # direct, motivational, reflective
+    duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)  # estimated minutes (15/30/45/60)
     is_quick: Mapped[bool] = mapped_column(Boolean, default=False)  # manual quick task (no goal)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)  # manual ordering within a day
     completed: Mapped[bool] = mapped_column(Boolean, default=False)

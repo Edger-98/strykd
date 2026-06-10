@@ -16,7 +16,8 @@ class Goal(Base):
     description: Mapped[str] = mapped_column(Text, nullable=False)
     duration_days: Mapped[int] = mapped_column(Integer, nullable=False)
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
-    end_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[date | None] = mapped_column(Date, nullable=True)  # null for lifestyle goals
+    goal_type: Mapped[str] = mapped_column(String, default="sprint")  # sprint (finite) | lifestyle (ongoing)
     status: Mapped[str] = mapped_column(String, default="active")  # active, completed, paused
     page_public: Mapped[bool] = mapped_column(Boolean, default=True)  # show this goal on the public page
 
@@ -35,6 +36,7 @@ class Goal(Base):
     # Per-goal narrative (each goal has its own chapter timeline + projected outcome)
     chapter_titles: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     projected_outcome: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_recommended_days: Mapped[int | None] = mapped_column(Integer, nullable=True)  # feasibility suggestion
 
     user: Mapped["User"] = relationship("User", back_populates="goals")
     tasks: Mapped[list["DailyTask"]] = relationship("DailyTask", back_populates="goal", cascade="all, delete-orphan")
