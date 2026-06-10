@@ -100,7 +100,7 @@ async def _persist_plan(db: AsyncSession, user: User, body: OnboardingRequest, p
     # Honor the public/private page toggle
     user.page_public = body.page_public
 
-    # Start the 3-day free trial clock on first onboarding
+    # Start the 30-day free trial clock on first onboarding
     if user.trial_start_date is None:
         user.trial_start_date = datetime.now(timezone.utc)
 
@@ -173,7 +173,7 @@ async def onboard(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # No payment required: completing onboarding starts a 3-day, no-card free trial.
+    # No payment required: completing onboarding starts a 30-day, no-card free trial.
     if body.duration_days < 1 or body.duration_days > 365:
         raise HTTPException(status_code=422, detail="duration_days must be between 1 and 365")
 

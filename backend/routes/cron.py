@@ -135,7 +135,7 @@ async def streak_reminders(
     if x_cron_secret != settings.cron_secret:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    # Trial-ending email on the last full day (locks the next day), deduped.
+    # Trial-ending warning on day 25 (5 days before the 30-day trial ends), deduped.
     trial_emails = 0
     te_res = await db.execute(
         select(User).where(
@@ -146,7 +146,7 @@ async def streak_reminders(
     )
     for u in te_res.scalars().all():
         ts = trial_status(u)
-        if ts.get("day") == TRIAL_DAYS and not ts.get("subscription_active"):
+        if ts.get("day") == TRIAL_DAYS - 5 and not ts.get("subscription_active"):
             await send_trial_ending_email(u.email, u.name)
             u.trial_ending_sent = True
             trial_emails += 1

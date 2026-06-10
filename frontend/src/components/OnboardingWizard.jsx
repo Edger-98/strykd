@@ -304,7 +304,7 @@ export default function OnboardingWizard({ onSubmit, busy, error, mode = 'signup
                   <button className="pill pill-outline pill-sm" onClick={back}><ArrowLeft size={15} /> Back</button>
                 </div>
               )}
-              {isLast && !addMode && <p style={St.trial}>No charge for 3 days. Cancel anytime.</p>}
+              {isLast && !addMode && <p style={St.trial}>30 days free. No card needed.</p>}
               {cur.text && <p style={St.hint}>Press Cmd/Ctrl + Enter to continue</p>}
             </motion.div>
           </AnimatePresence>

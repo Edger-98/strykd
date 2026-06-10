@@ -113,7 +113,7 @@ export default function Landing() {
           </motion.div>
           <motion.p style={S.heroFine}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.7, delay: 0.4 }}>
-            3 days free · No credit card needed · Cancel anytime
+            30 days free · No credit card needed · Cancel anytime
           </motion.p>
         </div>
       </header>

@@ -14,7 +14,7 @@ export default function Terms() {
           'You are responsible for keeping your login credentials secure and for all activity under your account. Provide accurate information and keep it up to date. You must be at least 13 years old to use Strykd.',
         ]},
         { title: 'Free trial, subscription, and billing', body: [
-          'New users get a 3-day free trial with full access and no card required. After the trial, continued access to the dashboard and AI features requires a subscription of $9 per month, billed through Stripe.',
+          'New users get a 30-day free trial with full access and no card required. After the trial, continued access to the dashboard and AI features requires a subscription of $9 per month, billed through Stripe.',
           'Your subscription renews automatically each month until you cancel. You can cancel anytime from Settings; access continues until the end of the current billing period.',
           'Refunds: you may request a full refund of your most recent payment within 7 days of subscribing, from Settings. A refund cancels your subscription immediately.',
         ]},
