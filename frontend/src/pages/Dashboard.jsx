@@ -6,6 +6,7 @@ import {
   CreditCard, Lock, Flame, ArrowRight, Loader2, PartyPopper,
 } from 'lucide-react'
 import Checklist from '../components/Checklist'
+import Celebration from '../components/Celebration'
 import ReplanPanel from '../components/ReplanPanel'
 import SignalWall from '../components/SignalWall'
 import DashSidebar, { SIDEBAR_W } from '../components/DashSidebar'
@@ -37,6 +38,7 @@ export default function Dashboard() {
   const [quickInput, setQuickInput] = useState('')
   const [quickBusy, setQuickBusy] = useState(false)
   const [gridDay, setGridDay] = useState(null)
+  const [celebration, setCelebration] = useState(null)
 
   const subscribe = async () => {
     setSubBusy(true); setSubError('')
@@ -103,6 +105,7 @@ export default function Dashboard() {
       ),
       quick_tasks: (d.quick_tasks || []).map(t => t.id === taskId ? { ...t, completed: true } : t),
     }))
+    if (res?.celebration) setCelebration(res.celebration)
   }
 
   if (error) return <Centered>{error}</Centered>
@@ -262,6 +265,7 @@ export default function Dashboard() {
 
       <AddGoalModal open={addOpen} onClose={() => setAddOpen(false)} onAdded={load} />
       <DayDrawer day={gridDay} onClose={() => setGridDay(null)} dark accent="var(--red)" />
+      <Celebration data={celebration} onDone={() => setCelebration(null)} />
     </div>
   )
 }

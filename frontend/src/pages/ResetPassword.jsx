@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Loader2, CheckCircle2, ArrowRight } from 'lucide-react'
 import { pageVariants } from '../motion'
+import PasswordField from '../components/PasswordField'
 import { api } from '../api'
 
 export default function ResetPassword() {
@@ -54,8 +55,8 @@ export default function ResetPassword() {
             <h1 className="h-lg display" style={{ margin: '16px 0 8px' }}>Set a new password.</h1>
             <p className="lead" style={{ fontSize: '1rem', marginBottom: 24 }}>Choose something you'll remember.</p>
             <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <input className="field" type="password" placeholder="New password" value={password} onChange={e => setPassword(e.target.value)} required />
-              <input className="field" type="password" placeholder="Confirm new password" value={confirm} onChange={e => setConfirm(e.target.value)} required />
+              <PasswordField className="field" placeholder="New password" value={password} onChange={e => setPassword(e.target.value)} required />
+              <PasswordField className="field" placeholder="Confirm new password" value={confirm} onChange={e => setConfirm(e.target.value)} required />
               {err && <p style={{ color: 'var(--red)', fontSize: '0.88rem' }}>{err}</p>}
               <button type="submit" className="pill pill-dark" disabled={busy} style={{ width: '100%', marginTop: 6 }}>
                 {busy ? <Loader2 size={18} className="spin-icon" /> : 'Reset password'}

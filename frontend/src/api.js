@@ -120,13 +120,14 @@ export const api = {
       duration_days: form.duration_days,
       aesthetic: form.aesthetic,
       life_area: form.life_area,
-      why_now: form.why_now,
-      past_blockers: form.past_blockers,
-      hours_per_day: form.hours_per_day,
-      daily_rhythm: form.daily_rhythm,
       page_public: form.page_public,
       goal_type: form.goal_type || 'sprint',
     }
+    // Optional fields are omitted when blank so the backend stores them as null.
+    if (form.why_now) params.why_now = form.why_now
+    if (form.past_blockers) params.past_blockers = form.past_blockers
+    if (form.hours_per_day) params.hours_per_day = form.hours_per_day
+    if (form.daily_rhythm) params.daily_rhythm = form.daily_rhythm
     if (form.ai_recommended_days) params.ai_recommended_days = form.ai_recommended_days
     return fetch(`${API}/onboarding/stream?${new URLSearchParams(params).toString()}`, {
       headers: { Authorization: `Bearer ${getToken()}` },

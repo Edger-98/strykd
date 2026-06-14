@@ -146,6 +146,61 @@ async def send_deadline_email(to: str, name: str, goal: str, day: int, total_day
     await _send_async(to, "Your goal ends in 3 days", _shell(body))
 
 
+async def send_weekly_reflection_email(
+    to: str, name: str, week_number: int, completed: int, total: int, streak_days: int, content: dict,
+) -> None:
+    first = (name or "there").split(" ")[0]
+    pct = round((completed / total) * 100) if total else 0
+
+    def stat(value, label):
+        return (
+            '<td style="text-align:center;padding:0 8px;">'
+            f'<div style="font-size:26px;font-weight:800;color:#fff;line-height:1;">{value}</div>'
+            f'<div style="font-size:11px;letter-spacing:.08em;color:#5C5C5C;text-transform:uppercase;'
+            f'font-weight:700;margin-top:6px;">{label}</div></td>'
+        )
+
+    stats = (
+        '<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:8px 0 24px;">'
+        '<tr>'
+        + stat(f"{completed}/{total}", "Tasks done")
+        + stat(f"{pct}%", "Completion")
+        + stat(streak_days, "Day streak")
+        + '</tr></table>'
+    )
+
+    def section(title, text):
+        return (
+            f'<p style="font-size:12px;letter-spacing:.1em;color:#FF2D2D;text-transform:uppercase;'
+            f'font-weight:700;margin:24px 0 8px;">{title}</p>'
+            f'<p style="color:#A1A1A1;font-size:15px;line-height:1.65;margin:0;">{text}</p>'
+        )
+
+    focus = content.get("focus_areas") or []
+    focus_items = "".join(
+        f'<tr><td style="padding:8px 0;border-bottom:1px solid #1F1F1F;color:#E5E5E5;font-size:15px;'
+        f'line-height:1.5;"><span style="color:#FF2D2D;font-weight:800;margin-right:10px;">{i + 1}</span>{f}</td></tr>'
+        for i, f in enumerate(focus[:3])
+    )
+
+    body = (
+        f'<h1 style="font-size:26px;font-weight:800;margin:16px 0 4px;">Week {week_number}, done.</h1>'
+        f'<p style="color:#A1A1A1;font-size:15px;line-height:1.6;margin:0 0 8px;">'
+        f"Here's what you built this week, {first}.</p>"
+        + stats
+        + section("What you built", content.get("celebrate", ""))
+        + section("The pattern to watch", content.get("struggle", ""))
+        + '<p style="font-size:12px;letter-spacing:.1em;color:#FF2D2D;text-transform:uppercase;'
+          'font-weight:700;margin:24px 0 4px;">Focus for next week</p>'
+        + '<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;">'
+        + focus_items + '</table>'
+        + _button(f"{settings.frontend_url}/dashboard", "Start week " + str(week_number + 1))
+    )
+    await _send_async(
+        to, f"Your Week {week_number} on Strykd — here's what you built", _shell(body)
+    )
+
+
 async def send_subscription_confirmation_email(to: str, name: str) -> None:
     first = (name or "there").split(" ")[0]
     body = (

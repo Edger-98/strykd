@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import DashSidebar, { SIDEBAR_W } from '../components/DashSidebar'
 import Avatar from '../components/Avatar'
+import PasswordField from '../components/PasswordField'
 import { pageVariants } from '../motion'
 import { api, clearToken, getToken } from '../api'
 
@@ -176,8 +177,8 @@ function SecuritySection() {
   return (
     <Section title="Security" desc="Change your password.">
       <div style={S.card}>
-        <Field label="Current password"><input className="d-field" type="password" value={cur} onChange={e => setCur(e.target.value)} /></Field>
-        <Field label="New password"><input className="d-field" type="password" value={next} onChange={e => setNext(e.target.value)} /></Field>
+        <Field label="Current password"><PasswordField className="d-field" value={cur} onChange={e => setCur(e.target.value)} /></Field>
+        <Field label="New password"><PasswordField className="d-field" value={next} onChange={e => setNext(e.target.value)} /></Field>
         {err && <p style={S.err}>{err}</p>}
         {msg && <p style={{ ...S.saved, marginBottom: 12 }}><Check size={14} /> {msg}</p>}
         <button className="pill pill-blue pill-sm" onClick={save} disabled={busy || !cur || !next}>

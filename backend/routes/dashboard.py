@@ -15,6 +15,7 @@ from models.task import DailyTask
 from models.theme import Theme
 from models.user import User
 from services.cache import bust_public_page, get_public_page, set_public_page
+from services.llm import congratulate_day
 from trial import require_active_access, trial_status
 
 router = APIRouter(tags=["dashboard"])
@@ -394,12 +395,30 @@ async def complete_task(
     await db.commit()
     await bust_public_page(current_user.slug)
 
+    # Celebrate when the day's full set of goal tasks is now complete.
+    celebration = None
+    if goal:
+        day_tasks = (await db.execute(
+            select(DailyTask).where(DailyTask.goal_id == goal.id, DailyTask.task_date == today)
+        )).scalars().all()
+        if day_tasks and all(t.completed for t in day_tasks):
+            day_number = (today - goal.start_date).days + 1
+            message = await congratulate_day(goal.description, [t.content for t in day_tasks])
+            if day_number > 0 and day_number % 7 == 0:
+                ctype, title = "chapter", f"Week {day_number // 7} complete"
+            elif streak > 0 and streak % 7 == 0:
+                ctype, title = "streak", f"{streak}-day streak unlocked"
+            else:
+                ctype, title = "day", "Day complete."
+            celebration = {"type": ctype, "title": title, "streak": streak, "message": message}
+
     return {
         "task_id": task_id,
         "goal_id": str(task.goal_id) if task.goal_id else None,
         "message": "Task completed",
         "streak_days": streak,
         "user_streak": current_user.streak_days,
+        "celebration": celebration,
     }
 
 

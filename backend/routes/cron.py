@@ -14,9 +14,9 @@ from models.user import User
 from services.cache import bust_public_page
 from services.email import (
     send_deadline_email, send_inactivity_nudge_email, send_streak_reminder_email,
-    send_trial_ending_email,
+    send_trial_ending_email, send_weekly_reflection_email,
 )
-from services.llm import generate_nightly
+from services.llm import generate_nightly, generate_weekly_reflection
 from trial import TRIAL_DAYS, trial_status
 
 router = APIRouter(prefix="/cron", tags=["cron"])
@@ -182,6 +182,7 @@ async def streak_reminders(
     users = users_res.scalars().all()
 
     sent = 0
+    weekly = 0
     for user in users:
         try:
             tz = ZoneInfo(user.timezone or "UTC")
@@ -189,6 +190,13 @@ async def streak_reminders(
             tz = ZoneInfo("UTC")
         now_local = datetime.now(tz)
         local_today = now_local.date()
+
+        # Weekly reflection: Sundays at 9am local, once per week.
+        if (now_local.weekday() == 6 and now_local.hour == 9
+                and user.last_weekly_reflection != local_today):
+            if await _send_weekly_reflection(db, user, local_today):
+                user.last_weekly_reflection = local_today
+                weekly += 1
 
         # Only fire after 8pm local, once per local day
         if now_local.hour < 20:
@@ -222,4 +230,40 @@ async def streak_reminders(
         sent += 1
 
     await db.commit()
-    return {"reminders_sent": sent, "trial_ending_emails": trial_emails, "inactivity_nudges": nudges}
+    return {"reminders_sent": sent, "trial_ending_emails": trial_emails,
+            "inactivity_nudges": nudges, "weekly_reflections": weekly}
+
+
+async def _send_weekly_reflection(db: AsyncSession, user: User, local_today: date) -> bool:
+    """Gather the past week's stats and send the reflection email. False if no active goal."""
+    week_start = local_today - timedelta(days=6)
+    goals = (await db.execute(
+        select(Goal).where(Goal.user_id == user.id, Goal.status == "active")
+    )).scalars().all()
+    if not goals:
+        return False
+
+    total = await db.scalar(
+        select(func.count()).select_from(DailyTask).where(
+            DailyTask.user_id == user.id,
+            DailyTask.task_date >= week_start, DailyTask.task_date <= local_today,
+        )
+    ) or 0
+    completed = await db.scalar(
+        select(func.count()).select_from(DailyTask).where(
+            DailyTask.user_id == user.id,
+            DailyTask.task_date >= week_start, DailyTask.task_date <= local_today,
+            DailyTask.completed.is_(True),
+        )
+    ) or 0
+
+    earliest = min(g.start_date for g in goals)
+    week_number = max((local_today - earliest).days // 7 + 1, 1)
+
+    content = await generate_weekly_reflection(
+        [g.description for g in goals], week_number, completed, total, user.streak_days,
+    )
+    await send_weekly_reflection_email(
+        user.email, user.name, week_number, completed, total, user.streak_days, content,
+    )
+    return True

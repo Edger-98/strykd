@@ -6,6 +6,7 @@ import {
   CheckCircle2, TrendingUp, Loader2, Users, Calendar,
 } from 'lucide-react'
 import { pageVariants, revealVariants, staggerContainer, staggerItem, inView } from '../motion'
+import PasswordField from '../components/PasswordField'
 import { api, setToken } from '../api'
 
 const HERO_PHOTO = 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=1440&q=80'
@@ -255,7 +256,7 @@ function AuthView({ view, form, upd, submit, error, busy, toggle, forgot, back }
             </>
           )}
           <input className="field" type="email" placeholder="Email" value={form.email} onChange={upd('email')} required />
-          <input className="field" type="password" placeholder="Password" value={form.password} onChange={upd('password')} required />
+          <PasswordField className="field" placeholder="Password" value={form.password} onChange={upd('password')} required />
           {view === 'login' && (
             <button type="button" onClick={forgot}
               style={{ alignSelf: 'flex-end', background: 'none', border: 'none', color: 'var(--blue)', fontSize: '0.85rem', fontWeight: 600, marginTop: -4 }}>

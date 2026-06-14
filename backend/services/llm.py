@@ -134,6 +134,78 @@ async def generate_itinerary(name: str, tasks: list[str]) -> dict:
     return await _json_call(system, user, 2000)
 
 
+async def congratulate_day(goal_description: str, completed_tasks: list[str]) -> str:
+    """One short, specific congratulations for finishing all of the day's tasks."""
+    if not completed_tasks:
+        return "You showed up today. That's the whole game."
+    try:
+        system = (
+            "You are a sharp, warm accountability coach. The user just finished ALL their tasks for "
+            "the day. Write ONE short sentence (max 18 words) congratulating them, referencing what "
+            "they actually did. Specific and energetic, no clichES, no emojis, no quotes. "
+            "Never use em dashes; use commas or periods. Return ONLY the sentence."
+        )
+        user = (
+            f"Goal: {goal_description}\nToday they completed:\n"
+            + "\n".join(f"- {t}" for t in completed_tasks)
+        )
+        client = _get_client().with_options(max_retries=0, timeout=12.0)
+        resp = await client.messages.create(
+            model="claude-sonnet-4-6", max_tokens=80, system=system,
+            messages=[{"role": "user", "content": user}],
+        )
+        line = next(b.text for b in resp.content if b.type == "text").strip().strip('"')
+        return _strip_em_dashes(line) or "Every task done today. That's how momentum is built."
+    except Exception:
+        return "Every task done today. That's how momentum is built."
+
+
+async def generate_weekly_reflection(
+    goal_descriptions: list[str], week_number: int, completed: int, total: int, streak_days: int,
+) -> dict:
+    """Weekly reflection content. Returns {celebrate, struggle, focus_areas: [3]}."""
+    fallback = {
+        "celebrate": "You kept showing up this week. Every task you checked off is proof you are "
+                     "becoming someone who follows through.",
+        "struggle": "Some days slipped. That is normal. The pattern to watch is letting one missed "
+                    "day quietly become two.",
+        "focus_areas": [
+            "Protect your first task of the day, before anything else competes for your attention.",
+            "Aim for consistency over intensity. One task beats zero every time.",
+            "Notice which day you tend to slip, and plan a smaller, easier task for it.",
+        ],
+    }
+    try:
+        system = (
+            "You are a thoughtful, honest accountability coach writing a weekly reflection email. "
+            "Return ONLY JSON: "
+            '{"celebrate": "<one warm paragraph celebrating what they built this week>", '
+            '"struggle": "<one honest paragraph identifying the pattern in what they struggled with>", '
+            '"focus_areas": ["<specific focus area for next week>", "<another>", "<a third>"]}. '
+            "Be specific and direct. No clichES, no emojis, no quotes inside the strings. "
+            "Never use em dashes; use commas or periods."
+        )
+        user = (
+            f"Week {week_number}.\n"
+            f"Goals: {'; '.join(goal_descriptions) or 'their goal'}\n"
+            f"Tasks completed this week: {completed} of {total}.\n"
+            f"Current streak: {streak_days} days.\n"
+            "Write the reflection."
+        )
+        data = await _json_call(system, user, 700)
+        fa = data.get("focus_areas")
+        focus = [str(x) for x in fa[:3]] if isinstance(fa, list) and fa else fallback["focus_areas"]
+        while len(focus) < 3:
+            focus.append(fallback["focus_areas"][len(focus)])
+        return {
+            "celebrate": _strip_em_dashes(str(data.get("celebrate", ""))) or fallback["celebrate"],
+            "struggle": _strip_em_dashes(str(data.get("struggle", ""))) or fallback["struggle"],
+            "focus_areas": focus,
+        }
+    except Exception:
+        return fallback
+
+
 async def assess_feasibility(goal: str, duration_days: int, goal_type: str = "sprint") -> dict:
     """Judge whether the chosen timeline is realistic for the goal.
 

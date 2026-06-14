@@ -29,6 +29,7 @@ class User(Base):
     trial_ending_sent: Mapped[bool] = mapped_column(Boolean, default=False)  # day-6 trial email dedupe
     last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # last dashboard open
     last_nudge_sent: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # inactivity nudge dedupe
+    last_weekly_reflection: Mapped[date | None] = mapped_column(Date, nullable=True)  # Sunday reflection email dedupe
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     goals: Mapped[list["Goal"]] = relationship("Goal", back_populates="user", cascade="all, delete-orphan")

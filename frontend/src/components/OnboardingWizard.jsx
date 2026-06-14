@@ -87,16 +87,16 @@ export default function OnboardingWizard({ onSubmit, busy, error, mode = 'signup
     { key: 'goals', q: 'Let us get clear on your goal.', sub: "Tell me what's on your mind and I'll ask a few questions to sharpen it.",
       valid: () => form.goals.trim().length > 3, chat: true,
       render: () => <GoalChat lifeArea={form.life_area} initialGoal={form.goals} onApprove={approveGoal} /> },
-    { key: 'why_now', q: 'Why now?', sub: "What's the urgency? This becomes the fuel.",
-      valid: () => form.why_now.trim().length > 3, text: true,
+    { key: 'why_now', q: 'Why now?', sub: "What's the urgency? This becomes the fuel. Optional — your coach can ask later.",
+      valid: () => true, text: true, optional: true,
       render: () => <textarea autoFocus className="field" style={St.textarea}
-        placeholder="What makes this the moment? What's at stake?" value={form.why_now} onChange={e => set('why_now', e.target.value)} /> },
-    { key: 'past_blockers', q: 'What has stopped you before?', sub: 'The AI designs tasks to defuse these exact failure modes.',
-      valid: () => form.past_blockers.trim().length > 3, text: true,
+        placeholder="What makes this the moment? What's at stake?" value={form.why_now || ''} onChange={e => set('why_now', e.target.value)} /> },
+    { key: 'past_blockers', q: 'What has stopped you before?', sub: 'The AI designs tasks to defuse these failure modes. Optional — skip and refine as you go.',
+      valid: () => true, text: true, optional: true,
       render: () => <textarea autoFocus className="field" style={St.textarea}
-        placeholder="e.g. I start strong then get paralyzed by perfectionism" value={form.past_blockers} onChange={e => set('past_blockers', e.target.value)} /> },
+        placeholder="e.g. I start strong then get paralyzed by perfectionism" value={form.past_blockers || ''} onChange={e => set('past_blockers', e.target.value)} /> },
     { key: 'cadence', q: 'How much can you commit?', sub: 'Your plan is sized to fit. No impossible schedules.',
-      valid: () => form.hours_per_day >= 1, custom: true,
+      valid: () => form.goal_type === 'lifestyle' || form.duration_days >= 1, custom: true,
       render: () => {
         const lifestyle = form.goal_type === 'lifestyle'
         return (
@@ -124,8 +124,9 @@ export default function OnboardingWizard({ onSubmit, busy, error, mode = 'signup
                 value={form.duration_days} onChange={e => { set('duration_days', Number(e.target.value)); setFeas(null) }} /></Field>
             )}
 
-            <Field label="FOCUSED HOURS PER DAY?"><input type="number" min={1} max={16} className="field"
-              value={form.hours_per_day} onChange={e => set('hours_per_day', Number(e.target.value))} /></Field>
+            <Field label="FOCUSED HOURS PER DAY? (OPTIONAL)"><input type="number" min={1} max={16} className="field"
+              placeholder="Leave blank to let us size it" value={form.hours_per_day ?? ''}
+              onChange={e => set('hours_per_day', e.target.value === '' ? null : Number(e.target.value))} /></Field>
 
             {feas && (
               <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={St.feasBox}>
@@ -147,8 +148,8 @@ export default function OnboardingWizard({ onSubmit, busy, error, mode = 'signup
           </div>
         )
       } },
-    { key: 'daily_rhythm', q: 'When are you sharpest?', sub: 'The heaviest work goes into your peak window.',
-      valid: () => !!form.daily_rhythm,
+    { key: 'daily_rhythm', q: 'When are you sharpest?', sub: 'The heaviest work goes into your peak window. Optional.',
+      valid: () => true, optional: true,
       render: () => (
         <div style={{ display: 'flex', gap: 12 }}>
           {[{ id: 'morning', Icon: Sunrise, label: 'Morning' }, { id: 'evening', Icon: Moon, label: 'Evening' }].map(r => (
@@ -204,16 +205,31 @@ export default function OnboardingWizard({ onSubmit, busy, error, mode = 'signup
 
   const cur = steps[step]
   const isLast = step === steps.length - 1
-  const progress = ((step + 1) / steps.length) * 100
+
+  // Optional fields skipped or left blank are sent as null, not empty strings.
+  const finalize = f => ({
+    ...f,
+    why_now: f.why_now?.trim() ? f.why_now : null,
+    past_blockers: f.past_blockers?.trim() ? f.past_blockers : null,
+    daily_rhythm: f.daily_rhythm || null,
+    hours_per_day: f.hours_per_day || null,
+  })
 
   const advance = (fromKey) => {
     if (fromKey && cur.key !== fromKey) return
     setLocalErr('')
     if (!cur.valid()) { setLocalErr('Please complete this step.'); return }
-    if (isLast) { onSubmit(form); return }
+    if (isLast) { onSubmit(finalize(form)); return }
     setDir(1); setStep(s => s + 1)
   }
   const back = () => { setLocalErr(''); setDir(-1); setStep(s => Math.max(0, s - 1)) }
+  // Skip an optional step: clear its field and move on.
+  const skip = () => {
+    setLocalErr('')
+    if (cur.key) set(cur.key, '')
+    if (isLast) { onSubmit(finalize(form)); return }
+    setDir(1); setStep(s => s + 1)
+  }
   // The goal chat owns its own input + approval; on approval set the refined goal and advance.
   const approveGoal = refinedGoal => {
     setForm(f => ({ ...f, goals: refinedGoal }))
@@ -228,7 +244,7 @@ export default function OnboardingWizard({ onSubmit, busy, error, mode = 'signup
   // Cadence step: ongoing habits skip the timeline check; timed goals get a feasibility check.
   const cadenceContinue = async () => {
     if (form.goal_type === 'lifestyle') { goNext(); return }
-    if (form.duration_days < 1 || form.hours_per_day < 1) { setLocalErr('Please complete this step.'); return }
+    if (form.duration_days < 1) { setLocalErr('Set a number of days for this goal.'); return }
     setFeasBusy(true); setLocalErr('')
     try {
       const r = await api.validateGoal({ goal: form.goals, duration_days: Number(form.duration_days), goal_type: 'sprint' })
@@ -270,14 +286,25 @@ export default function OnboardingWizard({ onSubmit, busy, error, mode = 'signup
       {bg && <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${bg})`, backgroundSize: 'cover',
         backgroundPosition: 'center', opacity: 0.05, pointerEvents: 'none', zIndex: 0, borderRadius: 'inherit' }} />}
 
+      {/* Segmented progress: solid = required, dashed/hollow = optional */}
       <div style={St.progressTrack}>
-        <motion.div style={St.progressFill} animate={{ width: `${progress}%` }} transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }} />
+        {steps.map((s, i) => {
+          const reached = i <= step
+          return (
+            <motion.div key={s.key} initial={false}
+              animate={{ background: reached ? 'var(--black)' : (s.optional ? 'transparent' : 'var(--gray-line)') }}
+              transition={{ duration: 0.4 }}
+              style={{ flex: 1, height: '100%', borderRadius: 2,
+                border: !reached && s.optional ? '1px dashed var(--gray-line)' : 'none' }} />
+          )
+        })}
       </div>
 
       <div style={St.shell}>
         <div style={St.top}>
           <span style={St.logo}>{addMode ? 'NEW GOAL' : 'STRYKD'}</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {cur.optional && <span style={St.optChip}>Optional</span>}
             <span style={{ color: 'var(--gray-text)', fontSize: '0.9rem', fontWeight: 500 }}>Step {step + 1} of {steps.length}</span>
             {addMode && onClose && <button onClick={onClose} style={St.close} aria-label="Close"><X size={18} /></button>}
           </span>
@@ -291,12 +318,17 @@ export default function OnboardingWizard({ onSubmit, busy, error, mode = 'signup
               {cur.render()}
               {(localErr || error) && <p style={St.err}>{localErr || error}</p>}
               {!cur.chat && !cur.custom && (
-                <div style={St.nav}>
-                  {step > 0 && <button className="pill pill-outline pill-sm" onClick={back}><ArrowLeft size={15} /> Back</button>}
-                  <button className="pill pill-dark" onClick={() => advance()} style={{ marginLeft: 'auto' }}>
-                    {isLast ? (addMode ? 'Create this goal' : 'Start your free trial') : 'Continue'} <ArrowRight size={17} />
-                  </button>
-                </div>
+                <>
+                  <div style={St.nav}>
+                    {step > 0 && <button className="pill pill-outline pill-sm" onClick={back}><ArrowLeft size={15} /> Back</button>}
+                    <button className="pill pill-dark" onClick={() => advance()} style={{ marginLeft: 'auto' }}>
+                      {isLast ? (addMode ? 'Create this goal' : 'Start your free trial') : 'Continue'} <ArrowRight size={17} />
+                    </button>
+                  </div>
+                  {cur.optional && (
+                    <button type="button" onClick={skip} style={St.skip}>Skip for now</button>
+                  )}
+                </>
               )}
               {/* Back link for chat/custom steps (they advance via their own buttons) */}
               {(cur.chat || cur.custom) && step > 0 && (
@@ -336,8 +368,11 @@ function Field({ label, children }) {
 const St = {
   wrap: { position: 'relative', width: '100%', minHeight: 'inherit', display: 'flex', flexDirection: 'column' },
   generating: { minHeight: 420, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 },
-  progressTrack: { position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'var(--gray-line)', zIndex: 10, borderRadius: '16px 16px 0 0' },
-  progressFill: { height: '100%', background: 'var(--black)' },
+  progressTrack: { position: 'absolute', top: 0, left: 0, right: 0, height: 4, display: 'flex', gap: 4, padding: '0 2px', zIndex: 10 },
+  skip: { display: 'block', margin: '14px 0 0 auto', background: 'none', border: 'none', color: 'var(--gray-text)',
+    fontSize: '0.85rem', fontWeight: 500, textDecoration: 'underline', cursor: 'pointer' },
+  optChip: { fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--gray-text)',
+    background: 'var(--gray-section)', border: '1px solid var(--gray-line)', borderRadius: 50, padding: '4px 10px', textTransform: 'uppercase' },
   shell: { flex: 1, width: '100%', maxWidth: 600, margin: '0 auto', padding: '40px 24px', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 1 },
   top: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 40 },
   logo: { fontWeight: 800, letterSpacing: '0.12em', fontSize: '0.95rem' },

@@ -76,10 +76,11 @@ class OnboardingRequest(BaseModel):
     duration_days: int
     aesthetic: str  # e.g. "dark-ember", "arctic-focus", "soft-earth"
     life_area: str  # career | fitness | business | creative | personal-growth
-    why_now: str
-    past_blockers: str
-    hours_per_day: int
-    daily_rhythm: str  # morning | evening
+    # Optional context — skippable in onboarding; the AI coach can ask later.
+    why_now: str | None = None
+    past_blockers: str | None = None
+    hours_per_day: int | None = None
+    daily_rhythm: str | None = None  # morning | evening
     page_public: bool = True  # public or private page
     goal_type: str = "sprint"  # sprint (finite) | lifestyle (ongoing habit)
     ai_recommended_days: int | None = None
@@ -250,10 +251,10 @@ async def onboard_stream(
     duration_days: int = Query(...),
     aesthetic: str = Query(...),
     life_area: str = Query(...),
-    why_now: str = Query(...),
-    past_blockers: str = Query(...),
-    hours_per_day: int = Query(...),
-    daily_rhythm: str = Query(...),
+    why_now: str | None = Query(None),
+    past_blockers: str | None = Query(None),
+    hours_per_day: int | None = Query(None),
+    daily_rhythm: str | None = Query(None),
     page_public: bool = Query(True),
     goal_type: str = Query("sprint"),
     ai_recommended_days: int | None = Query(None),
