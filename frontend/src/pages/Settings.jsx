@@ -2,13 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
-  Menu, Loader2, Camera, Check, AlertTriangle, CreditCard, ExternalLink, Trash2,
+  Menu, Loader2, Camera, Check, AlertTriangle, CreditCard, ExternalLink, Trash2, Bell,
 } from 'lucide-react'
 import DashSidebar, { SIDEBAR_W } from '../components/DashSidebar'
 import Avatar from '../components/Avatar'
 import PasswordField from '../components/PasswordField'
 import { pageVariants } from '../motion'
 import { api, clearToken, getToken } from '../api'
+import { disablePush, enablePush, isIOS, isStandalone, pushPermission, pushSupported } from '../onesignal'
 
 const MAX_BYTES = 5 * 1024 * 1024
 
@@ -52,7 +53,8 @@ export default function Settings() {
         <ProfileSection me={me} onSaved={load} />
         <SecuritySection />
         <SubscriptionSection sub={me.subscription} trial={me.trial} />
-        <NotificationsSection initial={me.user.email_reminders} />
+        <EmailSection user={me.user} />
+        <PushSection user={me.user} />
         <DangerSection onDeleted={() => { clearToken(); nav('/') }} />
       </motion.main>
     </div>
@@ -285,27 +287,113 @@ function SubscriptionSection({ sub, trial }) {
   )
 }
 
-function NotificationsSection({ initial }) {
-  const [on, setOn] = useState(initial)
-  const [saving, setSaving] = useState(false)
+// The individually toggleable email types (matches the backend prefs keys).
+const EMAIL_TYPES = [
+  { key: 'welcome', label: 'Welcome email', hint: 'Sent once when you create your account.' },
+  { key: 'streak_reminders', label: 'Streak reminders', hint: 'A nudge if your streak is at risk and you haven\'t checked in.' },
+  { key: 'trial_ending', label: 'Trial ending notice', hint: 'A heads-up before your free trial ends.' },
+  { key: 'weekly_reflection', label: 'Weekly reflection', hint: 'Your Sunday recap of what you built and your focus for the week.' },
+  { key: 'goal_deadline', label: 'Goal deadline approaching', hint: 'A reminder a few days before a sprint goal wraps up.' },
+]
 
-  const change = async v => {
-    setOn(v); setSaving(true)
+function EmailSection({ user }) {
+  const [master, setMaster] = useState(user.email_reminders)
+  const [prefs, setPrefs] = useState(() => ({ ...(user.email_preferences || {}) }))
+  const [savingKey, setSavingKey] = useState('')
+
+  const changeMaster = async v => {
+    setMaster(v); setSavingKey('master')
     try { await api.updateMe({ email_reminders: v }) }
-    catch (e) { setOn(!v) }
-    finally { setSaving(false) }
+    catch (e) { setMaster(!v) }
+    finally { setSavingKey('') }
+  }
+
+  const changeType = async (key, v) => {
+    setPrefs(p => ({ ...p, [key]: v })); setSavingKey(key)
+    try { await api.updateMe({ email_preferences: { [key]: v } }) }
+    catch (e) { setPrefs(p => ({ ...p, [key]: !v })) }
+    finally { setSavingKey('') }
   }
 
   return (
-    <Section title="Notifications" desc="Control the emails Strykd sends you.">
+    <Section title="Email notifications" desc="Choose which emails Strykd sends you. Turning off all emails unsubscribes you completely.">
+      <div style={S.card}>
+        <label style={{ ...S.toggleRow, paddingBottom: 14, borderBottom: '1px solid var(--d-line)' }}>
+          <span>
+            <span style={{ fontWeight: 700 }}>All Strykd emails {savingKey === 'master' && <Loader2 size={13} className="spin-icon" style={{ verticalAlign: -1 }} />}</span>
+            <span style={S.toggleHint}>Master switch. When off, you won't receive any reminder or update emails.</span>
+          </span>
+          <Toggle on={master} onChange={changeMaster} />
+        </label>
+
+        <div style={{ opacity: master ? 1 : 0.45, pointerEvents: master ? 'auto' : 'none', marginTop: 8 }}>
+          {EMAIL_TYPES.map(t => (
+            <label key={t.key} style={{ ...S.toggleRow, marginBottom: 0 }}>
+              <span>
+                <span style={{ fontWeight: 600 }}>{t.label} {savingKey === t.key && <Loader2 size={13} className="spin-icon" style={{ verticalAlign: -1 }} />}</span>
+                <span style={S.toggleHint}>{t.hint}</span>
+              </span>
+              <Toggle on={prefs[t.key] !== false} onChange={v => changeType(t.key, v)} />
+            </label>
+          ))}
+        </div>
+      </div>
+    </Section>
+  )
+}
+
+function PushSection({ user }) {
+  const [on, setOn] = useState(user.push_enabled)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const iosNeedsInstall = isIOS() && !isStandalone()
+  const supported = pushSupported() || iosNeedsInstall
+
+  const change = async v => {
+    setErr('')
+    if (v) {
+      if (iosNeedsInstall) {
+        setErr('On iPhone, add Strykd to your Home Screen first (Share → Add to Home Screen), then open it from there to enable push.')
+        return
+      }
+      setBusy(true)
+      try {
+        const granted = await enablePush(user.id)
+        if (!granted) { setErr('Notifications are blocked. Enable them in your browser settings first.'); return }
+        await api.updateMe({ push_enabled: true })
+        setOn(true)
+      } catch (e) { setErr(e.message) }
+      finally { setBusy(false) }
+    } else {
+      setOn(false); setBusy(true)
+      try { await disablePush(); await api.updateMe({ push_enabled: false }) }
+      catch (e) { setOn(true); setErr(e.message) }
+      finally { setBusy(false) }
+    }
+  }
+
+  return (
+    <Section title="Push notifications" desc="Get streak reminders, deadline alerts, and celebrations on this device.">
       <div style={S.card}>
         <label style={{ ...S.toggleRow, marginBottom: 0 }}>
           <span>
-            <span style={{ fontWeight: 600 }}>Email reminders {saving && <Loader2 size={13} className="spin-icon" style={{ verticalAlign: -1 }} />}</span>
-            <span style={S.toggleHint}>Get a nudge if your streak is at risk and a few other key emails.</span>
+            <span style={{ fontWeight: 600 }}>
+              <Bell size={14} style={{ verticalAlign: -2, marginRight: 6 }} />
+              Push notifications {busy && <Loader2 size={13} className="spin-icon" style={{ verticalAlign: -1 }} />}
+            </span>
+            <span style={S.toggleHint}>
+              {!supported
+                ? 'Push notifications aren\'t supported in this browser.'
+                : iosNeedsInstall
+                  ? 'Add Strykd to your Home Screen (Share → Add to Home Screen), then open it from there to enable push.'
+                  : pushPermission() === 'denied'
+                    ? 'Notifications are blocked for Strykd. Re-enable them in your browser settings.'
+                    : 'Daily check-in nudges, streak-at-risk alerts, and day-complete celebrations.'}
+            </span>
           </span>
           <Toggle on={on} onChange={change} />
         </label>
+        {err && <p style={{ ...S.err, marginTop: 12, marginBottom: 0 }}>{err}</p>}
       </div>
     </Section>
   )

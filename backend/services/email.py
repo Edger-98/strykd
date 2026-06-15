@@ -10,6 +10,7 @@ import logging
 import resend
 
 from config import settings
+from services.tokens import make_unsubscribe_token
 
 logger = logging.getLogger("strykd.email")
 
@@ -44,7 +45,20 @@ def _button(href: str, label: str) -> str:
     )
 
 
-def _shell(body: str) -> str:
+def _unsubscribe_url(user_id) -> str:
+    return f"{settings.frontend_url}/unsubscribe?token={make_unsubscribe_token(user_id)}"
+
+
+def _shell(body: str, unsubscribe_url: str | None = None) -> str:
+    # CAN-SPAM: every Strykd email carries a one-click unsubscribe link.
+    unsub = (
+        '<p style="color:#5C5C5C;font-size:12px;line-height:1.5;margin:8px 0 0;">'
+        f'<a href="{unsubscribe_url}" style="color:#5C5C5C;text-decoration:underline;">Unsubscribe</a>'
+        ' from Strykd emails, or manage your preferences in '
+        f'<a href="{settings.frontend_url}/dashboard/settings" style="color:#5C5C5C;text-decoration:underline;">Settings</a>.'
+        '</p>'
+        if unsubscribe_url else ''
+    )
     return (
         '<div style="background:#000;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,sans-serif;'
         'padding:32px 16px;margin:0;">'
@@ -57,12 +71,14 @@ def _shell(body: str) -> str:
         f'<div style="padding:24px 32px 32px;color:#fff;">{body}</div>'
         '<div style="padding:18px 32px;border-top:1px solid #1F1F1F;">'
         '<p style="color:#5C5C5C;font-size:12px;line-height:1.5;margin:0;">'
-        'Strykd. AI accountability that ships.</p></div>'
+        'Strykd. AI accountability that ships.</p>'
+        + unsub +
+        '</div>'
         '</div></div>'
     )
 
 
-async def send_welcome_email(to: str, name: str) -> None:
+async def send_welcome_email(to: str, name: str, user_id) -> None:
     first = (name or "there").split(" ")[0]
     body = (
         f'<h1 style="font-size:28px;font-weight:800;margin:16px 0;">Welcome, {first}.</h1>'
@@ -74,10 +90,10 @@ async def send_welcome_email(to: str, name: str) -> None:
         "Show up. Check off. Don't break the streak.</p>"
         + _button(f"{settings.frontend_url}/onboard", "Build my plan")
     )
-    await _send_async(to, "Welcome to Strykd", _shell(body))
+    await _send_async(to, "Welcome to Strykd", _shell(body, _unsubscribe_url(user_id)))
 
 
-async def send_password_reset_email(to: str, name: str, reset_url: str) -> None:
+async def send_password_reset_email(to: str, name: str, reset_url: str, user_id) -> None:
     first = (name or "there").split(" ")[0]
     body = (
         f'<h1 style="font-size:28px;font-weight:800;margin:16px 0;">'
@@ -89,10 +105,10 @@ async def send_password_reset_email(to: str, name: str, reset_url: str) -> None:
         + '<p style="color:#5C5C5C;font-size:13px;line-height:1.6;">'
         f'Or paste this link into your browser:<br>{reset_url}</p>'
     )
-    await _send_async(to, "Reset your Strykd password", _shell(body))
+    await _send_async(to, "Reset your Strykd password", _shell(body, _unsubscribe_url(user_id)))
 
 
-async def send_streak_reminder_email(to: str, name: str, streak_days: int) -> None:
+async def send_streak_reminder_email(to: str, name: str, streak_days: int, user_id) -> None:
     first = (name or "there").split(" ")[0]
     streak_line = (
         f"You're on a {streak_days}-day streak. " if streak_days > 0 else ""
@@ -104,10 +120,10 @@ async def send_streak_reminder_email(to: str, name: str, streak_days: int) -> No
         f"{streak_line}Log in and check off at least one task to keep it alive.</p>"
         + _button(f"{settings.frontend_url}/dashboard", "Keep my streak alive")
     )
-    await _send_async(to, "Your streak is at risk", _shell(body))
+    await _send_async(to, "Your streak is at risk", _shell(body, _unsubscribe_url(user_id)))
 
 
-async def send_trial_ending_email(to: str, name: str) -> None:
+async def send_trial_ending_email(to: str, name: str, user_id) -> None:
     first = (name or "there").split(" ")[0]
     body = (
         f'<h1 style="font-size:28px;font-weight:800;margin:16px 0;">'
@@ -117,10 +133,10 @@ async def send_trial_ending_email(to: str, name: str) -> None:
         "streak going for $9/month, or cancel anytime before then and you won't be charged.</p>"
         + _button(f"{settings.frontend_url}/dashboard/settings", "Manage my subscription")
     )
-    await _send_async(to, "Your Strykd free trial ends in 5 days", _shell(body))
+    await _send_async(to, "Your Strykd free trial ends in 5 days", _shell(body, _unsubscribe_url(user_id)))
 
 
-async def send_inactivity_nudge_email(to: str, name: str) -> None:
+async def send_inactivity_nudge_email(to: str, name: str, user_id) -> None:
     first = (name or "there").split(" ")[0]
     body = (
         f'<h1 style="font-size:28px;font-weight:800;margin:16px 0;">'
@@ -130,10 +146,10 @@ async def send_inactivity_nudge_email(to: str, name: str) -> None:
         "Open your dashboard and knock out one task.</p>"
         + _button(f"{settings.frontend_url}/dashboard", "Open my dashboard")
     )
-    await _send_async(to, "Your goals are waiting", _shell(body))
+    await _send_async(to, "Your goals are waiting", _shell(body, _unsubscribe_url(user_id)))
 
 
-async def send_deadline_email(to: str, name: str, goal: str, day: int, total_days: int) -> None:
+async def send_deadline_email(to: str, name: str, goal: str, day: int, total_days: int, user_id) -> None:
     first = (name or "there").split(" ")[0]
     body = (
         f'<h1 style="font-size:28px;font-weight:800;margin:16px 0;">'
@@ -143,11 +159,11 @@ async def send_deadline_email(to: str, name: str, goal: str, day: int, total_day
         "Make these last days count.</p>"
         + _button(f"{settings.frontend_url}/dashboard", "Finish strong")
     )
-    await _send_async(to, "Your goal ends in 3 days", _shell(body))
+    await _send_async(to, "Your goal ends in 3 days", _shell(body, _unsubscribe_url(user_id)))
 
 
 async def send_weekly_reflection_email(
-    to: str, name: str, week_number: int, completed: int, total: int, streak_days: int, content: dict,
+    to: str, name: str, week_number: int, completed: int, total: int, streak_days: int, content: dict, user_id,
 ) -> None:
     first = (name or "there").split(" ")[0]
     pct = round((completed / total) * 100) if total else 0
@@ -197,11 +213,12 @@ async def send_weekly_reflection_email(
         + _button(f"{settings.frontend_url}/dashboard", "Start week " + str(week_number + 1))
     )
     await _send_async(
-        to, f"Your Week {week_number} on Strykd — here's what you built", _shell(body)
+        to, f"Your Week {week_number} on Strykd — here's what you built",
+        _shell(body, _unsubscribe_url(user_id)),
     )
 
 
-async def send_subscription_confirmation_email(to: str, name: str) -> None:
+async def send_subscription_confirmation_email(to: str, name: str, user_id) -> None:
     first = (name or "there").split(" ")[0]
     body = (
         f'<h1 style="font-size:28px;font-weight:800;margin:16px 0;">'
@@ -211,4 +228,4 @@ async def send_subscription_confirmation_email(to: str, name: str) -> None:
         "Your plan, your AI coach, and your public page are all live.</p>"
         + _button(f"{settings.frontend_url}/dashboard", "Open my dashboard")
     )
-    await _send_async(to, "Your Strykd subscription is active", _shell(body))
+    await _send_async(to, "Your Strykd subscription is active", _shell(body, _unsubscribe_url(user_id)))

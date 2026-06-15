@@ -14,9 +14,11 @@ import AddGoalModal from '../components/AddGoalModal'
 import ContributionGrid from '../components/ContributionGrid'
 import DayDrawer from '../components/DayDrawer'
 import ShareBar from '../components/ShareBar'
+import PushPrompt from '../components/PushPrompt'
 import { useCountUp } from '../hooks'
 import { pageVariants } from '../motion'
 import { api, clearToken, getToken } from '../api'
+import { ensureOneSignal } from '../onesignal'
 
 const truncate = (s, n) => (s && s.length > n ? s.slice(0, n).trimEnd() + '…' : s)
 
@@ -86,6 +88,11 @@ export default function Dashboard() {
       api.updateMe({ timezone: tz }).catch(() => {})
     }
   }, [data?.user])
+
+  // Identify the user to OneSignal so the backend can target their push.
+  useEffect(() => {
+    if (data?.user?.id) ensureOneSignal(data.user.id)
+  }, [data?.user?.id])
 
   useEffect(() => {
     if (searchParams.get('checkout') || searchParams.get('welcome')) {
@@ -187,6 +194,9 @@ export default function Dashboard() {
 
         {tab === 'today' ? (
           <div>
+            <PushPrompt trialDay={trial?.day} pushEnabled={user.push_enabled}
+              userId={user.id} onEnabled={load} />
+
             {/* Goal switcher */}
             <GoalSwitcher goals={goals} selectedId={activeGoal?.id} onSelect={setSelectedGoalId} onAdd={() => setAddOpen(true)} />
 

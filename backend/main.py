@@ -14,6 +14,7 @@ from routes.dashboard import router as dashboard_router
 from routes.journey import router as journey_router
 from routes.onboarding import router as onboarding_router
 from routes.proof import router as proof_router
+from routes.public import router as public_router
 from routes.shared import router as shared_router
 from routes.todos import router as todos_router
 
@@ -44,6 +45,7 @@ app.include_router(ai_router)
 app.include_router(billing_router)
 app.include_router(cron_router)
 app.include_router(proof_router)
+app.include_router(public_router)
 app.include_router(todos_router)
 app.include_router(shared_router)
 

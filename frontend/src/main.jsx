@@ -15,6 +15,7 @@ import SharedListPage from './pages/SharedListPage'
 import Contact from './pages/Contact'
 import Privacy from './pages/Privacy'
 import Terms from './pages/Terms'
+import Unsubscribe from './pages/Unsubscribe'
 
 function AnimatedRoutes() {
   const location = useLocation()
@@ -32,10 +33,18 @@ function AnimatedRoutes() {
         <Route path="/dashboard/settings" element={<Settings />} />
         <Route path="/reset-password/:token" element={<ResetPassword />} />
         <Route path="/shared/:code" element={<SharedListPage />} />
+        <Route path="/unsubscribe" element={<Unsubscribe />} />
         <Route path="/:slug" element={<PublicPage />} />
       </Routes>
     </AnimatePresence>
   )
+}
+
+// Register the PWA service worker (push display + app shell). Best-effort.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {})
+  })
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(

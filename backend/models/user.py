@@ -2,10 +2,20 @@ import uuid
 from datetime import date, datetime
 
 from sqlalchemy import Boolean, Date, DateTime, Integer, String, Text, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
+
+# Per-type marketing email preferences. `email_reminders` is the master switch
+# (flipped off by the one-click unsubscribe link); these gate individual types.
+DEFAULT_EMAIL_PREFERENCES = {
+    "welcome": True,
+    "streak_reminders": True,
+    "trial_ending": True,
+    "weekly_reflection": True,
+    "goal_deadline": True,
+}
 
 
 class User(Base):
@@ -23,9 +33,12 @@ class User(Base):
     trial_start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # app-side 7-day free trial
     avatar_url: Mapped[str | None] = mapped_column(Text, nullable=True)  # base64 data URL or external URL
     bio: Mapped[str | None] = mapped_column(String, nullable=True)  # max 160 chars, shown on public page
-    email_reminders: Mapped[bool] = mapped_column(Boolean, default=True)
+    email_reminders: Mapped[bool] = mapped_column(Boolean, default=True)  # master email opt-out (one-click unsubscribe)
+    email_preferences: Mapped[dict] = mapped_column(JSONB, default=lambda: dict(DEFAULT_EMAIL_PREFERENCES))  # per-type toggles
+    push_enabled: Mapped[bool] = mapped_column(Boolean, default=False)  # OneSignal web push opt-in
     timezone: Mapped[str] = mapped_column(String, default="UTC")
     last_reminder_sent: Mapped[date | None] = mapped_column(Date, nullable=True)  # streak reminder dedupe
+    last_streak_push_sent: Mapped[date | None] = mapped_column(Date, nullable=True)  # 9pm streak-at-risk push dedupe
     trial_ending_sent: Mapped[bool] = mapped_column(Boolean, default=False)  # day-6 trial email dedupe
     last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # last dashboard open
     last_nudge_sent: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # inactivity nudge dedupe

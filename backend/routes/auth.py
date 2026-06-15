@@ -74,7 +74,7 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     await db.refresh(user)
 
     # Welcome email — best-effort, never blocks registration
-    await send_welcome_email(user.email, user.name)
+    await send_welcome_email(user.email, user.name, user.id)
 
     return TokenResponse(access_token=_create_token(str(user.id)))
 
@@ -110,7 +110,7 @@ async def forgot_password(body: ForgotPasswordRequest, db: AsyncSession = Depend
     if user:
         token = _create_reset_token(str(user.id))
         reset_url = f"{settings.frontend_url}/reset-password/{token}"
-        await send_password_reset_email(user.email, user.name, reset_url)
+        await send_password_reset_email(user.email, user.name, reset_url, user.id)
     return {"message": "If that email is registered, a reset link is on its way."}
 
 

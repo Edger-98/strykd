@@ -13,7 +13,7 @@ from models.goal import Goal
 from models.signal_wall import SignalWall
 from models.task import DailyTask
 from models.theme import Theme
-from models.user import User
+from models.user import DEFAULT_EMAIL_PREFERENCES, User
 from routes.auth import _hash_password, _verify_password
 from services.cache import bust_public_page
 from trial import trial_status
@@ -29,6 +29,8 @@ class ProfileUpdate(BaseModel):
     bio: str | None = None
     avatar_url: str | None = None
     email_reminders: bool | None = None
+    email_preferences: dict | None = None
+    push_enabled: bool | None = None
     timezone: str | None = None
     page_public: bool | None = None
 
@@ -43,6 +45,8 @@ def _user_dict(u: User) -> dict:
         "id": str(u.id), "name": u.name, "email": u.email, "slug": u.slug,
         "bio": u.bio or "", "avatar_url": u.avatar_url, "page_public": u.page_public,
         "email_reminders": u.email_reminders, "timezone": u.timezone,
+        "email_preferences": {**DEFAULT_EMAIL_PREFERENCES, **(u.email_preferences or {})},
+        "push_enabled": u.push_enabled,
         "streak_days": u.streak_days,
     }
 
@@ -86,6 +90,15 @@ async def update_me(body: ProfileUpdate, db: AsyncSession = Depends(get_db), cur
         current_user.avatar_url = body.avatar_url or None
     if body.email_reminders is not None:
         current_user.email_reminders = body.email_reminders
+    if body.email_preferences is not None:
+        # Merge over known keys only; ignore anything unexpected.
+        merged = {**DEFAULT_EMAIL_PREFERENCES, **(current_user.email_preferences or {})}
+        for k in DEFAULT_EMAIL_PREFERENCES:
+            if k in body.email_preferences:
+                merged[k] = bool(body.email_preferences[k])
+        current_user.email_preferences = merged
+    if body.push_enabled is not None:
+        current_user.push_enabled = body.push_enabled
     if body.timezone is not None:
         current_user.timezone = body.timezone
     if body.page_public is not None:

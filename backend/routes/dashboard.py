@@ -16,6 +16,7 @@ from models.theme import Theme
 from models.user import User
 from services.cache import bust_public_page, get_public_page, set_public_page
 from services.llm import congratulate_day
+from services.push import send_push
 from trial import require_active_access, trial_status
 
 router = APIRouter(tags=["dashboard"])
@@ -301,6 +302,7 @@ async def get_dashboard(
     data["user"]["email"] = current_user.email
     data["user"]["avatar_url"] = current_user.avatar_url
     data["user"]["timezone"] = current_user.timezone
+    data["user"]["push_enabled"] = current_user.push_enabled
     data["user"]["subscription_active"] = current_user.subscription_active
     data["trial"] = trial_status(current_user)
 
@@ -411,6 +413,10 @@ async def complete_task(
             else:
                 ctype, title = "day", "Day complete."
             celebration = {"type": ctype, "title": title, "streak": streak, "message": message}
+
+            # Day-complete celebration push (best-effort; only if push is enabled).
+            if current_user.push_enabled:
+                await send_push(current_user.id, f"{title} 🎉", message)
 
     return {
         "task_id": task_id,

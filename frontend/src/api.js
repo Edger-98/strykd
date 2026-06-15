@@ -137,6 +137,11 @@ export const api = {
   // Account / settings
   getMe: () => req('GET', '/me'),
   updateMe: body => req('PATCH', '/me', body),
+
+  // Runtime client config (e.g. OneSignal app id) — no auth
+  getPublicConfig: () => fetch(`${API}/public-config`).then(r => r.ok ? r.json() : {}),
+  // One-click email unsubscribe — no auth, token carries the user id
+  unsubscribe: token => publicJson('POST', '/unsubscribe', { token }),
   changePassword: body => req('POST', '/me/password', body),
   deleteAccount: () => req('DELETE', '/me'),
 

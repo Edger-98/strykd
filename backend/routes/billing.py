@@ -181,7 +181,7 @@ async def stripe_webhook(
             )
             user.subscription_active = True
             await db.commit()
-            await send_subscription_confirmation_email(user.email, user.name)
+            await send_subscription_confirmation_email(user.email, user.name, user.id)
 
     elif etype == "customer.subscription.deleted":
         user = await _user_from_event_object(db, obj)
@@ -200,8 +200,8 @@ async def stripe_webhook(
     elif etype == "customer.subscription.trial_will_end":
         # Stripe fires this 3 days before the trial ends (i.e. before first charge)
         user = await _user_from_event_object(db, obj)
-        if user:
-            await send_trial_ending_email(user.email, user.name)
+        if user and user.email_reminders and (user.email_preferences or {}).get("trial_ending", True):
+            await send_trial_ending_email(user.email, user.name, user.id)
 
     # Acknowledge all other events without action
     return {"received": True}

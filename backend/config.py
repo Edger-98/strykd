@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     base_domain: str = "strykdapp.com"
     cron_secret: str = "changeme-cron-secret"
 
+    # OneSignal — web push notifications
+    onesignal_app_id: str = ""
+    onesignal_rest_api_key: str = ""
+
     # AWS S3 — daily visual proof uploads
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""

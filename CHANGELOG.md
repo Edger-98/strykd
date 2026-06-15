@@ -2,6 +2,38 @@
 
 All notable changes to Strykd, most recent first.
 
+## Email unsubscribe & preferences
+
+- **One-click unsubscribe (CAN-SPAM).** Every Strykd email now carries an
+  unsubscribe link in the footer pointing to `/unsubscribe?token={jwt}`. The token
+  is a signed, non-expiring JWT carrying the user id — no login required. The page
+  flips the master email switch off and confirms "You have been unsubscribed from
+  Strykd emails."
+- **Per-type email preferences.** New `email_preferences` JSONB column on `users`
+  with toggles for welcome email, streak reminders, trial ending notice, weekly
+  reflection, and goal-deadline emails. Every send checks the master switch
+  (`email_reminders`) **and** the per-type preference. Settings gained an "Email
+  notifications" section exposing all of them.
+- Idempotent startup migration backfills the new columns on the existing DB.
+
+## PWA & push notifications
+
+- **Progressive Web App.** Added `manifest.json` (standalone display, brand
+  icons, theme colors), a root-scope service worker (`sw.js`) handling push
+  display + notification clicks, and the iOS/Android install meta tags. Strykd is
+  now installable to the home screen.
+- **OneSignal web push.** Integrated the OneSignal React SDK (worker scoped under
+  `/push/onesignal/`). The app id is fetched at runtime from `/public-config` so
+  it isn't baked into the build. Users are targeted by their Strykd user id
+  (OneSignal external id). New `ONESIGNAL_APP_ID` / `ONESIGNAL_REST_API_KEY`
+  config. ⚠️ Push is inert until those secrets are set in the server `.env`.
+- **Push types:** daily check-in reminder (8pm if nothing completed), streak at
+  risk (9pm), day-complete celebration (on finishing the day), and the weekly
+  reflection (Sunday 9am). Email remains the fallback for users without push.
+- **Permission prompt.** From trial day 2 the dashboard shows a subtle "Get streak
+  reminders on your phone" prompt; on iPhone it shows add-to-home-screen
+  instructions first. A "Push notifications" toggle was added to Settings.
+
 ## Billing & trial
 
 - **30-day free trial.** App-side trial (`TRIAL_DAYS`) extended from 3 to 30 days:
