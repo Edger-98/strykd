@@ -40,12 +40,9 @@ function AnimatedRoutes() {
   )
 }
 
-// Register the PWA service worker (push display + app shell). Best-effort.
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {})
-  })
-}
+// Note: the service worker is registered by OneSignal (root-scope
+// /OneSignalSDKWorker.js). We intentionally do NOT register a second worker
+// here — two workers competing for the root scope is what broke web push.
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

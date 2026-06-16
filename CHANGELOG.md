@@ -22,11 +22,14 @@ All notable changes to Strykd, most recent first.
   icons, theme colors), a root-scope service worker (`sw.js`) handling push
   display + notification clicks, and the iOS/Android install meta tags. Strykd is
   now installable to the home screen.
-- **OneSignal web push.** Integrated the OneSignal React SDK (worker scoped under
-  `/push/onesignal/`). The app id is fetched at runtime from `/public-config` so
-  it isn't baked into the build. Users are targeted by their Strykd user id
-  (OneSignal external id). New `ONESIGNAL_APP_ID` / `ONESIGNAL_REST_API_KEY`
-  config. ⚠️ Push is inert until those secrets are set in the server `.env`.
+- **OneSignal web push.** Integrated the OneSignal React SDK using its default
+  **root-scope** worker, served at `/OneSignalSDKWorker.js` (a custom
+  `/push/onesignal/` scope made OneSignal report "App not configured for web
+  push"). Strykd no longer registers a competing root worker — the old `sw.js`
+  is now a self-unregistering kill-switch. The app id is read from
+  `/public-config` (with a baked-in fallback). Users are targeted by their
+  Strykd user id (OneSignal external id). New `ONESIGNAL_APP_ID` /
+  `ONESIGNAL_REST_API_KEY` config.
 - **Push types:** daily check-in reminder (8pm if nothing completed), streak at
   risk (9pm), day-complete celebration (on finishing the day), and the weekly
   reflection (Sunday 9am). Email remains the fallback for users without push.

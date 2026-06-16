@@ -1,13 +1,18 @@
 /* OneSignal web-push integration.
  *
  * The app id is fetched at runtime from the backend (`/public-config`) so it
- * never has to be baked into the static build. OneSignal registers its own
- * service worker under the /push/onesignal/ scope, leaving the root scope to
- * Strykd's own sw.js. The logged-in user is identified to OneSignal by their
- * Strykd user id (external id), which is how the backend targets pushes.
+ * never has to be baked into the static build. OneSignal owns the root-scope
+ * service worker (`/OneSignalSDKWorker.js`) using its default paths — which is
+ * what the OneSignal dashboard is configured for; using a custom path/scope
+ * makes it report "App not configured for web push". The logged-in user is
+ * identified to OneSignal by their Strykd user id (external id), which is how
+ * the backend targets pushes.
  */
 import OneSignal from 'react-onesignal'
 import { api } from './api'
+
+// Must match the OneSignal app configured for https://strykdapp.com.
+const ONESIGNAL_APP_ID = '0ec653e3-8df0-4a38-ad41-d04f82294fa9'
 
 let initPromise = null
 
@@ -34,12 +39,14 @@ export const pushPermission = () =>
 export function ensureOneSignal(userId) {
   if (!initPromise) {
     initPromise = (async () => {
+      // Prefer the backend-provided id, but fall back to the known constant so
+      // init never fails just because /public-config is briefly unreachable.
       const cfg = await api.getPublicConfig().catch(() => ({}))
-      if (!cfg?.onesignal_app_id) return false
+      const appId = cfg?.onesignal_app_id || ONESIGNAL_APP_ID
+      if (!appId) return false
+      // Default (root) service worker — OneSignalSDKWorker.js at /, scope /.
       await OneSignal.init({
-        appId: cfg.onesignal_app_id,
-        serviceWorkerParam: { scope: '/push/onesignal/' },
-        serviceWorkerPath: 'push/OneSignalSDKWorker.js',
+        appId,
         allowLocalhostAsSecureOrigin: true,
       })
       return true
