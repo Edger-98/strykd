@@ -4,9 +4,13 @@ All notable changes to Strykd, most recent first.
 
 ## AI brainstorm panel
 
-- **Per-task "Ask AI" chat.** Every task row gets a Sparkles button (beside the
-  camera/calendar icons) that opens a right-side "AI Assistant" drawer — a chat
-  scoped to that task. User messages are red bubbles on the right, AI responses
+- **Unified task actions menu.** Replaced the row of icons (Ask AI, calendar,
+  proof, delete) with a single understated kebab (three-dot) menu per task row.
+  It's hidden until row hover on pointer devices and stays faintly visible/tappable
+  on touch. The menu holds Ask AI, Add to calendar (Google/Apple), Upload proof,
+  and Delete — one clean affordance instead of several competing icons.
+- **Per-task "Ask AI" chat.** Each task row can open a right-side "AI Assistant"
+  drawer (now via the actions menu) — a chat scoped to that task. User messages are red bubbles on the right, AI responses
   dark cards on the left; the header shows the task for context and the chat
   pre-loads an opening greeting.
 - **Streaming responses (SSE).** New `POST /tasks/{task_id}/brainstorm` streams

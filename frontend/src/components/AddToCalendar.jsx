@@ -8,6 +8,39 @@ const nextDay = iso => {                                   // all-day end is exc
 }
 const icsEscape = s => (s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n')
 
+// Standalone actions so other UIs (e.g. the task action menu) can add to
+// calendar without rendering this component's own dropdown.
+export function openGoogleCalendar(title, date, description = '') {
+  const day = date || new Date().toISOString().slice(0, 10)
+  const url = 'https://calendar.google.com/calendar/render?action=TEMPLATE'
+    + `&text=${encodeURIComponent(title)}`
+    + `&dates=${ymd(day)}/${ymd(nextDay(day))}`
+    + `&details=${encodeURIComponent(description)}`
+  window.open(url, '_blank', 'noopener')
+}
+
+export function downloadIcs(title, date, description = '') {
+  const day = date || new Date().toISOString().slice(0, 10)
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z'
+  const ics = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Strykd//EN', 'CALSCALE:GREGORIAN',
+    'BEGIN:VEVENT',
+    `UID:${Date.now()}-${Math.random().toString(36).slice(2)}@strykdapp.com`,
+    `DTSTAMP:${stamp}`,
+    `DTSTART;VALUE=DATE:${ymd(day)}`,
+    `DTEND;VALUE=DATE:${ymd(nextDay(day))}`,
+    `SUMMARY:${icsEscape(title)}`,
+    `DESCRIPTION:${icsEscape(description)}`,
+    'END:VEVENT', 'END:VCALENDAR',
+  ].join('\r\n')
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = 'strykd-task.ics'
+  a.click()
+  URL.revokeObjectURL(a.href)
+}
+
 /**
  * "Add to Calendar" control: a small dropdown with Google (URL) and Apple (.ics).
  * No OAuth. Props: title, date (YYYY-MM-DD), description, dark.
@@ -24,36 +57,8 @@ export default function AddToCalendar({ title, date, description = '', dark = tr
     return () => document.removeEventListener('mousedown', onDoc)
   }, [open])
 
-  const google = () => {
-    const url = 'https://calendar.google.com/calendar/render?action=TEMPLATE'
-      + `&text=${encodeURIComponent(title)}`
-      + `&dates=${ymd(day)}/${ymd(nextDay(day))}`
-      + `&details=${encodeURIComponent(description)}`
-    window.open(url, '_blank', 'noopener')
-    setOpen(false)
-  }
-
-  const apple = () => {
-    const stamp = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z'
-    const ics = [
-      'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Strykd//EN', 'CALSCALE:GREGORIAN',
-      'BEGIN:VEVENT',
-      `UID:${Date.now()}-${Math.random().toString(36).slice(2)}@strykdapp.com`,
-      `DTSTAMP:${stamp}`,
-      `DTSTART;VALUE=DATE:${ymd(day)}`,
-      `DTEND;VALUE=DATE:${ymd(nextDay(day))}`,
-      `SUMMARY:${icsEscape(title)}`,
-      `DESCRIPTION:${icsEscape(description)}`,
-      'END:VEVENT', 'END:VCALENDAR',
-    ].join('\r\n')
-    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = 'strykd-task.ics'
-    a.click()
-    URL.revokeObjectURL(a.href)
-    setOpen(false)
-  }
+  const google = () => { openGoogleCalendar(title, day, description); setOpen(false) }
+  const apple = () => { downloadIcs(title, day, description); setOpen(false) }
 
   const c = dark
     ? { fg: 'var(--d-text-muted)', menu: 'var(--d-card)', line: 'var(--d-line)', text: 'var(--d-text)' }

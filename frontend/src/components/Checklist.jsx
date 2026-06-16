@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, Reorder, useDragControls } from 'framer-motion'
-import { Check, Trash2, GripVertical, Camera, Sparkles } from 'lucide-react'
+import { Check, GripVertical } from 'lucide-react'
 import { api } from '../api'
 import ProofModal from './ProofModal'
-import AddToCalendar from './AddToCalendar'
+import TaskMenu from './TaskMenu'
 import BrainstormDrawer from './BrainstormDrawer'
 
 const VOICE = {
@@ -147,37 +147,6 @@ function Row({ task, last, busy, editing, draft, setDraft, onToggle, onBeginEdit
         </span>
       )}
 
-      {/* ask AI */}
-      <button onClick={onBrainstorm} aria-label="Ask AI about this task" title="Ask AI"
-        style={{ flexShrink: 0, background: 'transparent', border: 'none', color: 'var(--red)',
-          padding: 4, display: 'grid', placeItems: 'center', cursor: 'pointer',
-          opacity: hover ? 0.95 : 0.45, transition: 'opacity 0.15s' }}>
-        <Sparkles size={16} />
-      </button>
-
-      {/* add to calendar */}
-      <span style={{ flexShrink: 0, opacity: hover ? 0.8 : 0.35, transition: 'opacity 0.15s' }}>
-        <AddToCalendar title={task.content} date={task.task_date} description={goalName} dark />
-      </span>
-
-      {/* proof upload */}
-      <button onClick={onProof} aria-label="Submit proof"
-        title={task.proof_url ? 'Proof submitted' : 'Submit visual proof'}
-        style={{ flexShrink: 0, background: 'transparent', border: 'none',
-          color: task.proof_url ? '#34C759' : 'var(--d-text-muted)',
-          padding: 4, display: 'grid', placeItems: 'center', cursor: 'pointer',
-          opacity: task.proof_url ? 1 : (hover ? 0.8 : 0.35), transition: 'opacity 0.15s' }}>
-        <Camera size={16} />
-      </button>
-
-      {/* delete (on hover) */}
-      <button onClick={onRemove} aria-label="Delete task"
-        style={{ flexShrink: 0, background: 'transparent', border: 'none', color: 'var(--d-text-muted)',
-          padding: 4, display: 'grid', placeItems: 'center', cursor: 'pointer',
-          opacity: hover ? 0.8 : 0, transition: 'opacity 0.15s' }}>
-        <Trash2 size={15} />
-      </button>
-
       {task.duration_minutes ? (
         <span style={{ flexShrink: 0, fontSize: '0.7rem', color: 'var(--d-text-muted)', whiteSpace: 'nowrap' }}>
           ~{task.duration_minutes} min
@@ -188,6 +157,10 @@ function Row({ task, last, busy, editing, draft, setDraft, onToggle, onBeginEdit
         color: v.color, border: `1px solid ${v.color}`, borderRadius: 5, padding: '2px 6px', opacity: 0.85 }}>
         {v.label}
       </span>
+
+      {/* unified task actions menu (Ask AI, calendar, proof, delete) */}
+      <TaskMenu task={task} title={task.content} date={task.task_date} description={goalName}
+        hover={hover} onAskAI={onBrainstorm} onProof={onProof} onDelete={onRemove} />
     </Reorder.Item>
   )
 }
