@@ -15,6 +15,13 @@ All notable changes to Strykd, most recent first.
   conversation is kept in frontend state only — nothing is persisted.
 - **Save as task / Clear chat.** Any AI response can be saved as a new quick task;
   a Clear chat button resets the conversation. The drawer is full-screen on mobile.
+- **iMessage redesign + short replies.** The system prompt now enforces "smart
+  friend texting advice" responses (3-4 short paragraphs, no markdown). Markdown
+  (`#`, `*`, `|`, blank lines) is stripped server-side in a chunk-boundary-safe
+  streaming filter (and again client-side). The drawer reads like iMessage: white
+  AI bubbles left, red user bubbles right, 14px text, roomier spacing, an
+  animated three-dot typing indicator, a fixed composer with an arrow send
+  button, and an 85vh bottom-sheet with slide-up entrance on mobile.
 
 ## Email unsubscribe & preferences
 

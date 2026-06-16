@@ -706,8 +706,37 @@ _BRAINSTORM_SYSTEM = (
     "Task: {task}. Their overall goal: {goal}. They are on day {day} of {total} days. "
     "They have {hours} hours per day available. What has blocked them before: {blockers}. "
     "Be specific, practical, and direct. Give concrete examples and actionable steps. "
-    "Never be vague. When suggesting sub-tasks make them as specific as the original task."
+    "Never be vague. When suggesting sub-tasks make them as specific as the original task. "
+    "CRITICAL: Respond like a smart friend texting advice, NOT like a consultant writing a "
+    "report. Maximum 3-4 short paragraphs. No markdown headers (no # or ##). No bullet point "
+    "walls. No tables. No bold text overload. Write in plain conversational sentences. Be direct "
+    "and specific but keep it short. If you need to list options, write them as natural sentences "
+    "not bullet points. The user is on their phone, they want a quick punchy response they can "
+    "actually read."
 )
+
+
+def _md_filter(text: str, state: dict) -> str:
+    """Strip leftover markdown from streamed chat tokens, chunk-boundary safe.
+
+    Removes `#`, `*` and `|` (so `##`, `**` and table pipes disappear regardless
+    of how they're split across SSE chunks) and collapses runs of newlines to a
+    single newline. `state` carries the trailing-newline flag between chunks."""
+    out = []
+    prev_nl = state.get("nl", False)
+    for ch in text:
+        if ch in "#*|":
+            continue
+        if ch == "\n":
+            if prev_nl:
+                continue
+            prev_nl = True
+            out.append("\n")
+        else:
+            prev_nl = False
+            out.append(ch)
+    state["nl"] = prev_nl
+    return "".join(out)
 
 
 async def stream_brainstorm(*, task, goal, day, total, hours, blockers, messages):
@@ -738,6 +767,7 @@ async def stream_brainstorm(*, task, goal, day, total, hours, blockers, messages
         return
 
     client = _get_client()
+    md_state: dict = {}
     async with client.messages.stream(
         model="claude-sonnet-4-6",
         max_tokens=1500,
@@ -745,7 +775,9 @@ async def stream_brainstorm(*, task, goal, day, total, hours, blockers, messages
         messages=anth,
     ) as stream:
         async for text in stream.text_stream:
-            yield text
+            cleaned = _md_filter(text, md_state)
+            if cleaned:
+                yield cleaned
 
 
 _NIGHTLY_SYSTEM_PROMPT = f"""\
