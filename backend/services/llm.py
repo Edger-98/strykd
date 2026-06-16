@@ -701,6 +701,53 @@ async def stream_replan(current_tasks: list[str], change_request: str, context: 
             yield text.replace('—', ', ').replace('–', ', ')
 
 
+_BRAINSTORM_SYSTEM = (
+    "You are a world class coach and strategist helping a user with a specific task. "
+    "Task: {task}. Their overall goal: {goal}. They are on day {day} of {total} days. "
+    "They have {hours} hours per day available. What has blocked them before: {blockers}. "
+    "Be specific, practical, and direct. Give concrete examples and actionable steps. "
+    "Never be vague. When suggesting sub-tasks make them as specific as the original task."
+)
+
+
+async def stream_brainstorm(*, task, goal, day, total, hours, blockers, messages):
+    """Stream a coaching chat response about a single task.
+
+    `messages` is the frontend conversation as [{role, content}]. The opening
+    canned assistant greeting (and any leading non-user turns) is dropped so the
+    request starts with a user turn, as the API requires. Conversation state is
+    not persisted; it lives entirely in the request."""
+    system = _BRAINSTORM_SYSTEM.format(
+        task=task or "unspecified",
+        goal=goal or "unspecified",
+        day=day if day is not None else "unspecified",
+        total=total if total is not None else "unspecified",
+        hours=hours if hours is not None else "unspecified",
+        blockers=blockers or "unspecified",
+    )
+
+    anth: list[dict] = []
+    for m in messages or []:
+        role = m.get("role")
+        content = (m.get("content") or "").strip()
+        if role in ("user", "assistant") and content:
+            anth.append({"role": role, "content": content})
+    while anth and anth[0]["role"] != "user":
+        anth.pop(0)
+    if not anth:
+        return
+
+    client = _get_client()
+    async with client.messages.stream(
+        model="claude-sonnet-4-6",
+        max_tokens=1500,
+        system=system,
+        messages=anth,
+    ) as stream:
+        async for text in stream.text_stream:
+            yield text
+
+
 _NIGHTLY_SYSTEM_PROMPT = f"""\
 {_COACH_IDENTITY}
 

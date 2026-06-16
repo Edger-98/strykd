@@ -2,6 +2,20 @@
 
 All notable changes to Strykd, most recent first.
 
+## AI brainstorm panel
+
+- **Per-task "Ask AI" chat.** Every task row gets a Sparkles button (beside the
+  camera/calendar icons) that opens a right-side "AI Assistant" drawer — a chat
+  scoped to that task. User messages are red bubbles on the right, AI responses
+  dark cards on the left; the header shows the task for context and the chat
+  pre-loads an opening greeting.
+- **Streaming responses (SSE).** New `POST /tasks/{task_id}/brainstorm` streams
+  tokens back word by word via `stream_brainstorm`. The system prompt feeds the
+  model the task, goal, day number, hours available, and past blockers. The
+  conversation is kept in frontend state only — nothing is persisted.
+- **Save as task / Clear chat.** Any AI response can be saved as a new quick task;
+  a Clear chat button resets the conversation. The drawer is full-screen on mobile.
+
 ## Email unsubscribe & preferences
 
 - **One-click unsubscribe (CAN-SPAM).** Every Strykd email now carries an

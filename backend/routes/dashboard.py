@@ -1,7 +1,9 @@
+import json
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,7 +17,7 @@ from models.task import DailyTask
 from models.theme import Theme
 from models.user import User
 from services.cache import bust_public_page, get_public_page, set_public_page
-from services.llm import congratulate_day
+from services.llm import congratulate_day, stream_brainstorm
 from services.push import send_push
 from trial import require_active_access, trial_status
 
@@ -450,6 +452,62 @@ async def _owned_task(task_id: str, current_user: User, db: AsyncSession) -> Dai
         if goal:
             return task
     raise HTTPException(status_code=403, detail="Not your task")
+
+
+class BrainstormMessage(BaseModel):
+    role: str
+    content: str
+
+
+class BrainstormRequest(BaseModel):
+    messages: list[BrainstormMessage] = []
+
+
+@router.post("/tasks/{task_id}/brainstorm")
+async def brainstorm(
+    task_id: str,
+    body: BrainstormRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_active_access),
+):
+    """SSE chat: a coach talks the user through a single task. Stateless — the
+    full conversation is supplied each call and nothing is persisted."""
+    task = await _owned_task(task_id, current_user, db)
+
+    # Pull goal context when the task belongs to a goal (quick tasks have none).
+    goal_desc = day = total = hours = blockers = None
+    if task.goal_id:
+        goal = await db.scalar(select(Goal).where(Goal.id == task.goal_id))
+        if goal:
+            goal_desc = goal.description
+            total = goal.duration_days
+            day = min(max((date.today() - goal.start_date).days + 1, 1), goal.duration_days)
+            hours = goal.hours_per_day
+            blockers = goal.past_blockers
+
+    messages = [{"role": m.role, "content": m.content} for m in body.messages]
+
+    async def event_stream():
+        try:
+            async for token in stream_brainstorm(
+                task=task.content, goal=goal_desc, day=day, total=total,
+                hours=hours, blockers=blockers, messages=messages,
+            ):
+                if token:
+                    yield f"data: {json.dumps(token)}\n\n"
+        except Exception as exc:
+            yield f"data: {json.dumps(f'[ERROR] {exc}')}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 @router.patch("/tasks/{task_id}")

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, Reorder, useDragControls } from 'framer-motion'
-import { Check, Trash2, GripVertical, Camera } from 'lucide-react'
+import { Check, Trash2, GripVertical, Camera, Sparkles } from 'lucide-react'
 import { api } from '../api'
 import ProofModal from './ProofModal'
 import AddToCalendar from './AddToCalendar'
+import BrainstormDrawer from './BrainstormDrawer'
 
 const VOICE = {
   direct: { label: 'DIRECT', color: '#0071E3' },
@@ -26,6 +27,7 @@ export default function Checklist({ tasks = [], onComplete, reload, goalName = '
   const [editing, setEditing] = useState(null)
   const [draft, setDraft] = useState('')
   const [proofTask, setProofTask] = useState(null)
+  const [brainstormTask, setBrainstormTask] = useState(null)
 
   // Keep local order in sync when the parent supplies a new task list
   useEffect(() => { setItems(tasks) }, [tasks])
@@ -86,16 +88,18 @@ export default function Checklist({ tasks = [], onComplete, reload, goalName = '
             draft={draft} setDraft={setDraft}
             onToggle={() => toggle(task)} onBeginEdit={() => beginEdit(task)}
             onSaveEdit={() => saveEdit(task)} onRemove={() => remove(task)}
-            onProof={() => setProofTask(task)} />
+            onProof={() => setProofTask(task)} onBrainstorm={() => setBrainstormTask(task)} />
         ))}
       </Reorder.Group>
       <ProofModal open={!!proofTask} task={proofTask}
         onClose={() => setProofTask(null)} onResult={() => reload && reload()} />
+      <BrainstormDrawer task={brainstormTask}
+        onClose={() => setBrainstormTask(null)} onSavedTask={() => reload && reload()} />
     </>
   )
 }
 
-function Row({ task, last, busy, editing, draft, setDraft, onToggle, onBeginEdit, onSaveEdit, onRemove, onProof, goalName }) {
+function Row({ task, last, busy, editing, draft, setDraft, onToggle, onBeginEdit, onSaveEdit, onRemove, onProof, onBrainstorm, goalName }) {
   const controls = useDragControls()
   const [hover, setHover] = useState(false)
   const inputRef = useRef(null)
@@ -142,6 +146,14 @@ function Row({ task, last, busy, editing, draft, setDraft, onToggle, onBeginEdit
           </span>
         </span>
       )}
+
+      {/* ask AI */}
+      <button onClick={onBrainstorm} aria-label="Ask AI about this task" title="Ask AI"
+        style={{ flexShrink: 0, background: 'transparent', border: 'none', color: 'var(--red)',
+          padding: 4, display: 'grid', placeItems: 'center', cursor: 'pointer',
+          opacity: hover ? 0.95 : 0.45, transition: 'opacity 0.15s' }}>
+        <Sparkles size={16} />
+      </button>
 
       {/* add to calendar */}
       <span style={{ flexShrink: 0, opacity: hover ? 0.8 : 0.35, transition: 'opacity 0.15s' }}>

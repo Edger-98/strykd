@@ -175,6 +175,15 @@ export const api = {
 
   replanConfirm: body => req('POST', '/replan/confirm', body),
 
+  // Per-task AI brainstorm chat — returns the raw Response for SSE streaming.
+  brainstormStream: (taskId, messages, signal) =>
+    fetch(`${API}/tasks/${taskId}/brainstorm`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ messages }),
+      signal,
+    }),
+
   // Returns the raw Response for streaming
   replanStream: (change_request) =>
     fetch(`${API}/replan`, {
