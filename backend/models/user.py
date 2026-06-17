@@ -30,7 +30,7 @@ class User(Base):
     last_checkin: Mapped[date | None] = mapped_column(Date, nullable=True)
     subscription_active: Mapped[bool] = mapped_column(Boolean, default=False)
     page_public: Mapped[bool] = mapped_column(Boolean, default=True)  # public/private page toggle
-    trial_start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # app-side 7-day free trial
+    trial_start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # app-side 45-day free trial
     avatar_url: Mapped[str | None] = mapped_column(Text, nullable=True)  # base64 data URL or external URL
     bio: Mapped[str | None] = mapped_column(String, nullable=True)  # max 160 chars, shown on public page
     email_reminders: Mapped[bool] = mapped_column(Boolean, default=True)  # master email opt-out (one-click unsubscribe)

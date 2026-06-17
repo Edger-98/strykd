@@ -14,11 +14,10 @@ from models.user import User
 from services.cache import bust_public_page
 from services.email import (
     send_deadline_email, send_inactivity_nudge_email, send_streak_reminder_email,
-    send_trial_ending_email, send_weekly_reflection_email,
+    send_weekly_reflection_email,
 )
 from services.llm import generate_nightly, generate_weekly_reflection
 from services.push import send_push
-from trial import TRIAL_DAYS, trial_status
 
 router = APIRouter(prefix="/cron", tags=["cron"])
 
@@ -143,23 +142,7 @@ async def streak_reminders(
     if x_cron_secret != settings.cron_secret:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    # Trial-ending warning on day 25 (5 days before the 30-day trial ends), deduped.
-    trial_emails = 0
-    te_res = await db.execute(
-        select(User).where(
-            User.subscription_active.is_(False),
-            User.trial_ending_sent.is_(False),
-            User.trial_start_date.isnot(None),
-        )
-    )
-    for u in te_res.scalars().all():
-        ts = trial_status(u)
-        if ts.get("day") == TRIAL_DAYS - 5 and not ts.get("subscription_active"):
-            if _email_pref(u, "trial_ending"):
-                await send_trial_ending_email(u.email, u.name, u.id)
-            u.trial_ending_sent = True
-            trial_emails += 1
-    await db.commit()
+    # Trial-ending warning emails removed: Strykd is free, there is no trial to end.
 
     # Inactivity nudge: no dashboard open in 6h during active hours (8am-10pm local),
     # at most one nudge per 6h, only for users who actually have an active goal.
@@ -263,8 +246,7 @@ async def streak_reminders(
 
     await db.commit()
     return {"reminders_sent": sent, "streak_at_risk_pushes": streak_pushes,
-            "trial_ending_emails": trial_emails, "inactivity_nudges": nudges,
-            "weekly_reflections": weekly}
+            "inactivity_nudges": nudges, "weekly_reflections": weekly}
 
 
 async def _send_weekly_reflection(db: AsyncSession, user: User, local_today: date) -> bool:

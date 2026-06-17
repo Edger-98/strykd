@@ -1,58 +1,31 @@
-"""App-side free trial logic.
+"""App-side access logic.
 
-Users get TRIAL_DAYS (30) of full access with no card. Access is gated AFTER
-the trial unless they have an active subscription:
-
-  day 1..28  → full access (a warning email goes out on day 25)
-  day 29..30 → full access + "ends soon" banner (frontend)
-  day 31+    → locked (dashboard + AI features) until subscribed
-
-The public page is never gated.
+Strykd is free for everyone with no expiration. Nothing is gated behind payment.
+The billing/Stripe code remains in place (so subscriptions can be re-enabled
+later) but no feature checks against it. `trial_status` always reports a never
+ending, never locked state, and `require_active_access` never blocks.
 """
-from datetime import datetime, timezone
-
-from fastapi import Depends, HTTPException
+from fastapi import Depends
 
 from deps import get_current_user
 from models.user import User
 
-TRIAL_DAYS = 30
+# Kept for any code/imports that still reference it; trials are no longer enforced.
+TRIAL_DAYS = 45
 
 
 def trial_status(user: User) -> dict:
-    """Compute the trial state for a user. 1-indexed `day`."""
-    if user.subscription_active:
-        return {"subscription_active": True, "locked": False, "ending_soon": False,
-                "day": None, "days_left": None, "trial_start_date": None}
-
-    start = user.trial_start_date
-    if start is None:
-        # Trial hasn't started yet (not onboarded) — treat as fresh day 1.
-        return {"subscription_active": False, "locked": False, "ending_soon": False,
-                "day": 1, "days_left": TRIAL_DAYS, "trial_start_date": None}
-
-    if start.tzinfo is None:
-        start = start.replace(tzinfo=timezone.utc)
-    elapsed_days = (datetime.now(timezone.utc) - start).days  # floor of full 24h periods
-    day = elapsed_days + 1
-    days_left = max(0, TRIAL_DAYS - elapsed_days)
-    locked = day >= TRIAL_DAYS + 1            # day 31+
-    ending_soon = (not locked) and day >= TRIAL_DAYS - 1  # day 29 or 30
+    """Always-free state. No trial countdown, no lock — kept for API shape."""
     return {
-        "subscription_active": False, "locked": locked, "ending_soon": ending_soon,
-        "day": day, "days_left": days_left, "trial_start_date": start.isoformat(),
+        "subscription_active": False,
+        "locked": False,
+        "ending_soon": False,
+        "day": None,
+        "days_left": None,
+        "trial_start_date": None,
     }
 
 
 async def require_active_access(current_user: User = Depends(get_current_user)) -> User:
-    """Dependency that 402s once the free trial has ended (and no subscription).
-
-    Use to gate AI features and dashboard writes. Read-only public data is never
-    gated with this.
-    """
-    if trial_status(current_user)["locked"]:
-        raise HTTPException(
-            status_code=402,
-            detail="Your free trial has ended. Subscribe for $9/month to continue.",
-        )
+    """No-op gate: every authenticated user has full access (Strykd is free)."""
     return current_user

@@ -23,11 +23,11 @@ async def create_checkout_session(user_id: str, email: str, customer_id: str | N
         # client_reference_id lets the webhook map the session back to our user
         "client_reference_id": user_id,
         "metadata": {"user_id": user_id},
-        # 30-day free trial on the Stripe subscription (no charge until it ends).
+        # 45-day free trial on the Stripe subscription (no charge until it ends).
         # Carry user_id onto the subscription so subscription.* events map to our user.
         "subscription_data": {
             "metadata": {"user_id": user_id},
-            "trial_period_days": 30,
+            "trial_period_days": 45,
         },
     }
     if customer_id:

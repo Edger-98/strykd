@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
-  Menu, Loader2, Camera, Check, AlertTriangle, CreditCard, ExternalLink, Trash2, Bell,
+  Menu, Loader2, Camera, Check, AlertTriangle, Trash2, Bell,
 } from 'lucide-react'
 import DashSidebar, { SIDEBAR_W } from '../components/DashSidebar'
 import Avatar from '../components/Avatar'
@@ -52,7 +52,7 @@ export default function Settings() {
 
         <ProfileSection me={me} onSaved={load} />
         <SecuritySection />
-        <SubscriptionSection sub={me.subscription} trial={me.trial} />
+        <SubscriptionSection />
         <EmailSection user={me.user} />
         <PushSection user={me.user} />
         <DangerSection onDeleted={() => { clearToken(); nav('/') }} />
@@ -191,97 +191,17 @@ function SecuritySection() {
   )
 }
 
-function SubscriptionSection({ sub, trial }) {
-  const [busy, setBusy] = useState('')
-  const [err, setErr] = useState('')
-  const [cancelled, setCancelled] = useState(false)
-
-  const portal = async () => {
-    setBusy('portal'); setErr('')
-    try { const { portal_url } = await api.billingPortal(); if (portal_url) window.location.href = portal_url }
-    catch (e) { setErr(e.message); setBusy('') }
-  }
-  const checkout = async () => {
-    setBusy('checkout'); setErr('')
-    try { const { checkout_url } = await api.checkout(); if (checkout_url) window.location.href = checkout_url }
-    catch (e) { setErr(e.message); setBusy('') }
-  }
-  const cancel = async () => {
-    if (!window.confirm('Cancel your subscription? You keep access until the end of the current billing period.')) return
-    setBusy('cancel'); setErr('')
-    try { await api.cancelSubscription(); setCancelled(true) }
-    catch (e) { setErr(e.message) }
-    finally { setBusy('') }
-  }
-  const [refunded, setRefunded] = useState(false)
-  const refund = async () => {
-    if (!window.confirm(
-      'Request a full refund?\n\nWe refund your most recent payment and cancel your subscription immediately. '
-      + 'You lose access right away. Refunds are only available within 7 days of subscribing.'
-    )) return
-    setBusy('refund'); setErr('')
-    try { await api.requestRefund(); setRefunded(true); setCancelled(true) }
-    catch (e) { setErr(e.message) }
-    finally { setBusy('') }
-  }
-
-  const active = sub?.active && !refunded
-  const status = refunded ? 'refunded' : cancelled ? 'cancelled' : (sub?.status || (sub?.active ? 'active' : null))
-  const nextBilling = sub?.next_billing_date ? new Date(sub.next_billing_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : null
-
+function SubscriptionSection() {
   return (
-    <Section title="Subscription" desc="Manage your plan and billing.">
+    <Section title="Plan" desc="Your Strykd plan.">
       <div style={S.card}>
-        <div style={S.subRow}>
+        <div style={{ ...S.subRow, borderBottom: 'none' }}>
           <span style={{ color: 'var(--d-text-dim)' }}>Plan</span>
-          <span style={{ fontWeight: 600 }}>{active ? 'Strykd · $9/month' : 'Free trial'}</span>
+          <span style={{ fontWeight: 600, color: '#34C759' }}>Free</span>
         </div>
-        {status && (
-          <div style={S.subRow}>
-            <span style={{ color: 'var(--d-text-dim)' }}>Status</span>
-            <span style={{ fontWeight: 600, textTransform: 'capitalize',
-              color: status === 'active' ? '#34C759' : status === 'cancelled' ? 'var(--red)' : 'var(--d-text)' }}>{status}</span>
-          </div>
-        )}
-        {!active && trial?.days_left != null && (
-          <div style={S.subRow}>
-            <span style={{ color: 'var(--d-text-dim)' }}>Trial remaining</span>
-            <span style={{ fontWeight: 600 }}>{trial.days_left} day{trial.days_left === 1 ? '' : 's'}</span>
-          </div>
-        )}
-        {active && nextBilling && !cancelled && (
-          <div style={S.subRow}>
-            <span style={{ color: 'var(--d-text-dim)' }}>Next billing date</span>
-            <span style={{ fontWeight: 600 }}>{nextBilling}</span>
-          </div>
-        )}
-        {refunded && <p style={{ color: 'var(--d-text-dim)', fontSize: '0.9rem', marginTop: 12 }}>Your last payment was refunded and your subscription was cancelled.</p>}
-        {cancelled && !refunded && <p style={{ color: 'var(--d-text-dim)', fontSize: '0.9rem', marginTop: 12 }}>Your subscription will end at the close of the current period.</p>}
-
-        {err && <p style={S.err}>{err}</p>}
-        <div style={{ ...S.actionRow, marginTop: 20 }}>
-          {active ? (
-            <>
-              <button className="pill pill-dark pill-sm" onClick={portal} disabled={!!busy}>
-                {busy === 'portal' ? <Loader2 size={15} className="spin-icon" /> : <><CreditCard size={15} /> Manage billing</>}
-              </button>
-              {!cancelled && (
-                <button onClick={cancel} disabled={!!busy} style={S.dangerLink}>
-                  {busy === 'cancel' ? <Loader2 size={15} className="spin-icon" /> : 'Cancel subscription'}
-                </button>
-              )}
-              {sub?.refund_eligible && !refunded && (
-                <button onClick={refund} disabled={!!busy} style={S.dangerLink}>
-                  {busy === 'refund' ? <Loader2 size={15} className="spin-icon" /> : 'Request refund'}
-                </button>
-              )}
-            </>
-          ) : (
-            <button className="pill pill-blue pill-sm" onClick={checkout} disabled={!!busy}>
-              {busy === 'checkout' ? <Loader2 size={15} className="spin-icon" /> : <><CreditCard size={15} /> Subscribe for $9/month</>}
-            </button>
-          )}
-        </div>
+        <p style={{ color: 'var(--d-text-dim)', fontSize: '0.9rem', lineHeight: 1.55, marginTop: 8 }}>
+          Strykd is free to use, with full access to every feature. No subscription, no card, no expiration.
+        </p>
       </div>
     </Section>
   )
@@ -291,7 +211,6 @@ function SubscriptionSection({ sub, trial }) {
 const EMAIL_TYPES = [
   { key: 'welcome', label: 'Welcome email', hint: 'Sent once when you create your account.' },
   { key: 'streak_reminders', label: 'Streak reminders', hint: 'A nudge if your streak is at risk and you haven\'t checked in.' },
-  { key: 'trial_ending', label: 'Trial ending notice', hint: 'A heads-up before your free trial ends.' },
   { key: 'weekly_reflection', label: 'Weekly reflection', hint: 'Your Sunday recap of what you built and your focus for the week.' },
   { key: 'goal_deadline', label: 'Goal deadline approaching', hint: 'A reminder a few days before a sprint goal wraps up.' },
 ]

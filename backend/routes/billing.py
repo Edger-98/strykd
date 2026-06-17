@@ -10,7 +10,7 @@ from deps import get_current_user
 from models.billing import Billing
 from models.user import User
 from services import stripe as stripe_service
-from services.email import send_subscription_confirmation_email, send_trial_ending_email
+from services.email import send_subscription_confirmation_email
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
@@ -197,11 +197,8 @@ async def stripe_webhook(
             user.subscription_active = False
             await db.commit()
 
-    elif etype == "customer.subscription.trial_will_end":
-        # Stripe fires this 3 days before the trial ends (i.e. before first charge)
-        user = await _user_from_event_object(db, obj)
-        if user and user.email_reminders and (user.email_preferences or {}).get("trial_ending", True):
-            await send_trial_ending_email(user.email, user.name, user.id)
+    # customer.subscription.trial_will_end is intentionally ignored: Strykd is
+    # free and sends no trial-ending warnings.
 
     # Acknowledge all other events without action
     return {"received": True}

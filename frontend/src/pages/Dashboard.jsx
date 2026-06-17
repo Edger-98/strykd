@@ -2,8 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
-  ExternalLink, LogOut, Menu, X, Plus, Target as TargetIcon,
-  CreditCard, Lock, Flame, ArrowRight, Loader2, PartyPopper,
+  Menu, X, Plus, Target as TargetIcon, Loader2, PartyPopper,
 } from 'lucide-react'
 import Checklist from '../components/Checklist'
 import Celebration from '../components/Celebration'
@@ -22,6 +21,19 @@ import { ensureOneSignal } from '../onesignal'
 
 const truncate = (s, n) => (s && s.length > n ? s.slice(0, n).trimEnd() + '…' : s)
 
+// Goals are sometimes phrased with a leading time-frame clause
+// ("Within the next 90 days, cover all expenses…"). Strip that lead-in so the
+// switcher pill shows the actual goal, not the deadline.
+const goalLabel = (d) => {
+  if (!d) return d
+  const stripped = d.replace(
+    /^(?:with(?:in)?|in|over|by|during|across)\b[^,]*\b(?:days?|weeks?|months?|years?|quarters?)\b[^,]*,\s*/i,
+    '',
+  ).trim()
+  if (!stripped) return d
+  return stripped.charAt(0).toUpperCase() + stripped.slice(1)
+}
+
 export default function Dashboard() {
   const nav = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -29,10 +41,6 @@ export default function Dashboard() {
   const [error, setError] = useState('')
   const [navOpen, setNavOpen] = useState(false)
   const tab = searchParams.get('tab') === 'signal' ? 'signal' : 'today'
-  const [subBusy, setSubBusy] = useState(false)
-  const [subError, setSubError] = useState('')
-  // captured once on mount, before the strip effect clears them
-  const [justSubscribed] = useState(() => searchParams.get('checkout') === 'success')
   const [welcome] = useState(() => searchParams.get('welcome') === '1')
   const [bannerDismissed, setBannerDismissed] = useState(false)
   const [selectedGoalId, setSelectedGoalId] = useState(null)
@@ -41,15 +49,6 @@ export default function Dashboard() {
   const [quickBusy, setQuickBusy] = useState(false)
   const [gridDay, setGridDay] = useState(null)
   const [celebration, setCelebration] = useState(null)
-
-  const subscribe = async () => {
-    setSubBusy(true); setSubError('')
-    try {
-      const { checkout_url } = await api.checkout()
-      if (checkout_url) window.location.href = checkout_url
-      else { setSubBusy(false); setSubError('Could not start checkout. Please try again.') }
-    } catch (e) { setSubBusy(false); setSubError(e.message) }
-  }
 
   const load = useCallback(() => {
     api.dashboard().then(d => {
@@ -95,7 +94,7 @@ export default function Dashboard() {
   }, [data?.user?.id])
 
   useEffect(() => {
-    if (searchParams.get('checkout') || searchParams.get('welcome')) {
+    if (searchParams.get('welcome')) {
       setSearchParams({}, { replace: true })
     }
   }, [searchParams, setSearchParams])
@@ -119,17 +118,6 @@ export default function Dashboard() {
   if (!data) return <Centered>Loading…</Centered>
 
   const { user, goals = [], quick_tasks = [], signal_wall, trial } = data
-
-  // Trial over with no subscription, full-screen upgrade lock (unless they just paid)
-  if (trial?.locked && !justSubscribed) {
-    return <UpgradePrompt user={user} subscribe={subscribe} busy={subBusy} error={subError}
-      onManageGoals={() => nav('/dashboard/journey')}
-      onLogout={() => { clearToken(); nav('/') }} />
-  }
-
-  const subscribed = trial?.subscription_active || justSubscribed
-  const endingSoon = trial?.ending_soon && !subscribed
-  const daysLeft = trial?.days_left
 
   const activeGoal = goals.find(g => g.id === selectedGoalId) || goals[0] || null
   const goalTasks = activeGoal?.today_tasks || []
@@ -155,38 +143,14 @@ export default function Dashboard() {
             </p>
             <h1 className="h-lg display" style={{ marginTop: 6 }}>Hello, {user.name.split(' ')[0]}</h1>
           </div>
-          {subscribed ? (
-            <span style={{ ...S.trialBadge, color: '#34C759', borderColor: '#34C759', background: 'rgba(52,199,89,0.12)' }}>
-              <span style={{ ...S.trialDot, background: '#34C759' }} /> Subscribed
-            </span>
-          ) : !endingSoon && daysLeft != null ? (
-            <span style={S.trialBadge}>
-              <span style={S.trialDot} /> Free trial · {daysLeft} day{daysLeft === 1 ? '' : 's'} left
-            </span>
-          ) : null}
         </header>
 
-        {/* Day-6/7 persistent banner */}
-        {endingSoon && (
-          <motion.div style={S.endBanner} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
-              <Flame size={20} color="var(--red)" style={{ flexShrink: 0 }} />
-              <span><strong>Your free trial ends tomorrow.</strong> Keep your streak alive.</span>
-            </span>
-            <button className="pill pill-blue pill-sm" onClick={subscribe} disabled={subBusy} style={{ flexShrink: 0 }}>
-              {subBusy ? <Loader2 size={15} className="spin-icon" /> : <><CreditCard size={15} /> Subscribe for $9/month</>}
-            </button>
-          </motion.div>
-        )}
-
-        {/* One-time welcome / subscribed confirmation */}
-        {(welcome || justSubscribed) && !bannerDismissed && (
+        {/* One-time welcome */}
+        {welcome && !bannerDismissed && (
           <motion.div style={S.welcomeBanner} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
             <PartyPopper size={18} color="var(--blue)" style={{ flexShrink: 0 }} />
             <span style={{ flex: 1 }}>
-              {justSubscribed
-                ? <><strong>You're subscribed.</strong> Thanks for backing yourself. Keep showing up.</>
-                : <><strong>Your free trial has started.</strong> Full access, no card. Now show up and don't break the streak.</>}
+              <strong>You're all set.</strong> Full access to everything, free. Now show up and don't break the streak.
             </span>
             <button onClick={() => setBannerDismissed(true)} style={S.icon} aria-label="Dismiss"><X size={16} /></button>
           </motion.div>
@@ -288,7 +252,7 @@ function GoalSwitcher({ goals, selectedId, onSelect, onAdd }) {
         return (
           <button key={g.id} onClick={() => onSelect(g.id)}
             style={{ ...S.goalTab, ...(active ? S.goalTabActive : {}) }}>
-            {truncate(g.description, 20)}
+            {truncate(goalLabel(g.description), 20)}
           </button>
         )
       })}
@@ -315,43 +279,6 @@ function Centered({ children }) {
   )
 }
 
-function UpgradePrompt({ user, subscribe, busy, error, onLogout, onManageGoals }) {
-  return (
-    <div style={S.lockShell}>
-      <motion.div style={S.lockCard} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}>
-        <div style={S.lockIcon}><Lock size={26} color="var(--red)" /></div>
-        <h1 className="h-lg display" style={{ marginBottom: 12 }}>Your free trial has ended.</h1>
-        <p style={{ color: 'var(--d-text-dim)', fontSize: '1.05rem', lineHeight: 1.55, marginBottom: 8 }}>
-          {user.streak_days > 0
-            ? <>Don't lose your <strong style={{ color: 'var(--red)' }}>{user.streak_days}-day streak</strong>. Subscribe to keep your plan, your AI coach, and your momentum.</>
-            : <>Subscribe to unlock your daily plan, your AI coach, and keep your momentum going.</>}
-        </p>
-        <p style={{ color: 'var(--d-text-muted)', fontSize: '0.9rem', marginBottom: 28 }}>
-          Just $9/month. Your public page stays live either way.
-        </p>
-
-        {error && <p style={{ color: 'var(--red)', fontSize: '0.88rem', marginBottom: 16 }}>{error}</p>}
-
-        <button className="pill pill-blue pill-lg" onClick={subscribe} disabled={busy} style={{ width: '100%' }}>
-          {busy ? <Loader2 size={18} className="spin-icon" /> : <><CreditCard size={18} /> Subscribe for $9/month <ArrowRight size={16} /></>}
-        </button>
-
-        <div style={S.lockFoot}>
-          {onManageGoals && (
-            <button onClick={onManageGoals} style={S.lockLink}><TargetIcon size={14} /> Manage my goals</button>
-          )}
-          {user.page_public !== false && (
-            <a href={`/${user.slug}`} target="_blank" rel="noreferrer" style={S.lockLink}>
-              <ExternalLink size={14} /> View your public page
-            </a>
-          )}
-          <button onClick={onLogout} style={S.lockLink}><LogOut size={14} /> Log out</button>
-        </div>
-      </motion.div>
-    </div>
-  )
-}
 
 const S = {
   shell: { minHeight: '100vh', background: 'var(--d-panel)', display: 'flex', color: 'var(--d-text)' },

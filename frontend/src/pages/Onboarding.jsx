@@ -19,7 +19,7 @@ export default function Onboarding() {
   }
 
   if (phase === 'streaming' && form) {
-    // Cinematic streaming build, then straight to the dashboard with the 30-day trial live
+    // Cinematic streaming build, then straight to the dashboard (free, no payment step)
     return (
       <OnboardingStream
         form={form}

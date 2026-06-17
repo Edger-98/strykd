@@ -129,7 +129,7 @@ async def send_trial_ending_email(to: str, name: str, user_id) -> None:
         f'<h1 style="font-size:28px;font-weight:800;margin:16px 0;">'
         f'Your free trial is almost up, {first}.</h1>'
         '<p style="color:#A1A1A1;font-size:16px;line-height:1.6;">'
-        "In 5 days your 30-day free trial ends. Keep your plan, your AI coach, and your "
+        "In 5 days your 45-day free trial ends. Keep your plan, your AI coach, and your "
         "streak going for $9/month, or cancel anytime before then and you won't be charged.</p>"
         + _button(f"{settings.frontend_url}/dashboard/settings", "Manage my subscription")
     )

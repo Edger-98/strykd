@@ -13,10 +13,9 @@ export default function Terms() {
         { title: 'Your account', body: [
           'You are responsible for keeping your login credentials secure and for all activity under your account. Provide accurate information and keep it up to date. You must be at least 13 years old to use Strykd.',
         ]},
-        { title: 'Free trial, subscription, and billing', body: [
-          'New users get a 30-day free trial with full access and no card required. After the trial, continued access to the dashboard and AI features requires a subscription of $9 per month, billed through Stripe.',
-          'Your subscription renews automatically each month until you cancel. You can cancel anytime from Settings; access continues until the end of the current billing period.',
-          'Refunds: you may request a full refund of your most recent payment within 7 days of subscribing, from Settings. A refund cancels your subscription immediately.',
+        { title: 'Pricing', body: [
+          'Strykd is free to use. You get full access to every feature, including the dashboard, AI coaching, and your public page, with no credit card required and no expiration.',
+          'We may introduce paid plans in the future. If we ever do, we will give you clear notice in advance, and it will never remove access to anything you can use for free today without your consent.',
         ]},
         { title: 'Your content', body: [
           'You own the content you create on Strykd (goals, tasks, notes, photos, lists). You grant us the limited license needed to host, display, and process it to provide the service, including generating AI plans and itineraries and showing your public page when you choose to make it public.',

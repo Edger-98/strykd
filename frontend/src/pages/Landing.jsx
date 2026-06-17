@@ -87,7 +87,7 @@ export default function Landing() {
           <span style={S.logo}>STRYKD</span>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <button className="pill pill-outline pill-sm" onClick={() => setView('login')}>Log in</button>
-            <button className="pill pill-dark pill-sm" onClick={() => setView('register')}>Start free</button>
+            <button className="pill pill-dark pill-sm" onClick={() => setView('register')}>Start for free</button>
           </div>
         </div>
       </nav>
@@ -108,13 +108,13 @@ export default function Landing() {
           <motion.div style={S.heroCtas}
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.24, ease: [0.16, 1, 0.3, 1] }}>
             <button className="pill pill-dark pill-lg" onClick={() => setView('register')}>
-              Start free <ArrowRight size={18} />
+              Start for free <ArrowRight size={18} />
             </button>
             <button className="pill pill-outline pill-lg" onClick={() => setView('login')}>Log in</button>
           </motion.div>
           <motion.p style={S.heroFine}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.7, delay: 0.4 }}>
-            30 days free · No credit card needed · Cancel anytime
+            Free to use. No credit card needed.
           </motion.p>
         </div>
       </header>
@@ -203,7 +203,7 @@ export default function Landing() {
             <p className="lead" style={{ color: 'rgba(255,255,255,0.7)', maxWidth: 480, margin: '0 auto 36px' }}>
               The hardest part is day one. Start free, and let the chain do the rest.</p>
             <button className="pill pill-white pill-lg" onClick={() => setView('register')}>
-              Start free <ArrowRight size={18} />
+              Start for free <ArrowRight size={18} />
             </button>
           </Reveal>
         </div>
@@ -242,10 +242,10 @@ function AuthView({ view, form, upd, submit, error, busy, toggle, forgot, back }
       <div className="card" style={S.authCard}>
         <button onClick={back} style={S.authBack}><ArrowLeft size={16} /> Back</button>
         <h1 className="h-lg display" style={{ marginBottom: 8 }}>
-          {view === 'login' ? 'Welcome back.' : 'Start your free trial.'}
+          {view === 'login' ? 'Welcome back.' : 'Start for free.'}
         </h1>
         <p className="lead" style={{ fontSize: '1rem', marginBottom: 28 }}>
-          {view === 'login' ? 'Pick up right where you left off.' : 'No credit card. Cancel anytime. Just show up.'}
+          {view === 'login' ? 'Pick up right where you left off.' : 'Free to use. No credit card needed. Just show up.'}
         </p>
         <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {view === 'register' && (
@@ -271,7 +271,7 @@ function AuthView({ view, form, upd, submit, error, busy, toggle, forgot, back }
         <p style={{ textAlign: 'center', marginTop: 22, color: 'var(--gray-text)', fontSize: '0.9rem' }}>
           {view === 'login' ? "New here? " : 'Already have an account? '}
           <button onClick={toggle} style={{ background: 'none', border: 'none', color: 'var(--blue)', fontWeight: 600 }}>
-            {view === 'login' ? 'Start free' : 'Log in'}
+            {view === 'login' ? 'Start for free' : 'Log in'}
           </button>
         </p>
       </div>
