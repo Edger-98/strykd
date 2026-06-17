@@ -191,6 +191,11 @@ function SecuritySection() {
   )
 }
 
+// Strykd is free, so the old subscription UI (plan/status/trial-remaining,
+// Subscribe / Manage billing / Cancel / Refund buttons) was replaced with a
+// simple "Free" note. The billing API methods (api.checkout, billingPortal,
+// cancelSubscription, requestRefund) are intentionally kept in api.js so this
+// section can be restored if paid plans return.
 function SubscriptionSection() {
   return (
     <Section title="Plan" desc="Your Strykd plan.">

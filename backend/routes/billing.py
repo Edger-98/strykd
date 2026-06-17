@@ -197,8 +197,11 @@ async def stripe_webhook(
             user.subscription_active = False
             await db.commit()
 
-    # customer.subscription.trial_will_end is intentionally ignored: Strykd is
-    # free and sends no trial-ending warnings.
+    # customer.subscription.trial_will_end is intentionally ignored. Stripe fires
+    # it ~3 days before a subscription trial ends; we used to send a trial-ending
+    # email here, but Strykd is free now so no warning is sent. The webhook still
+    # processes subscription created/deleted and payment events above so billing
+    # stays functional if paid plans are re-enabled.
 
     # Acknowledge all other events without action
     return {"received": True}

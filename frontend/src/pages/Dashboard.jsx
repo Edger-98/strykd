@@ -117,6 +117,10 @@ export default function Dashboard() {
   if (error) return <Centered>{error}</Centered>
   if (!data) return <Centered>Loading…</Centered>
 
+  // Strykd is free: the trial countdown/subscribed badge, the "trial ends soon"
+  // banner, and the day-46 upgrade lock screen were all removed. `trial` is still
+  // destructured because the backend keeps the key (a free, never-locked stub) and
+  // PushPrompt reads trial?.day (now null) — see trial.py for the backend side.
   const { user, goals = [], quick_tasks = [], signal_wall, trial } = data
 
   const activeGoal = goals.find(g => g.id === selectedGoalId) || goals[0] || null

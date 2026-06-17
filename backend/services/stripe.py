@@ -2,6 +2,12 @@
 
 The Stripe Python SDK (v11) exposes async variants (`*_async`) of every
 network method. We use those so the FastAPI event loop is never blocked.
+
+NOTE: Strykd is currently free for everyone, so this module is DORMANT — the
+frontend no longer surfaces a checkout/subscribe button and no feature is gated
+behind a subscription (see trial.py). The code is kept fully functional so paid
+plans can be turned back on later by re-adding the UI entry points; nothing here
+needs to change to re-enable billing.
 """
 import stripe
 
@@ -23,6 +29,7 @@ async def create_checkout_session(user_id: str, email: str, customer_id: str | N
         # client_reference_id lets the webhook map the session back to our user
         "client_reference_id": user_id,
         "metadata": {"user_id": user_id},
+        # Dormant while Strykd is free. If billing is re-enabled this grants a
         # 45-day free trial on the Stripe subscription (no charge until it ends).
         # Carry user_id onto the subscription so subscription.* events map to our user.
         "subscription_data": {

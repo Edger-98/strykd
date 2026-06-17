@@ -142,7 +142,12 @@ async def streak_reminders(
     if x_cron_secret != settings.cron_secret:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    # Trial-ending warning emails removed: Strykd is free, there is no trial to end.
+    # Trial-ending warning emails removed. Strykd is free with no expiration, so
+    # there is no trial to warn about. The old loop here emailed users on day
+    # TRIAL_DAYS-5 (deduped via User.trial_ending_sent, now a dormant column) and
+    # also gated the send on the "trial_ending" email preference, which has been
+    # dropped from Settings. Streak reminders, weekly reflections, goal-deadline,
+    # and inactivity nudges below are unaffected.
 
     # Inactivity nudge: no dashboard open in 6h during active hours (8am-10pm local),
     # at most one nudge per 6h, only for users who actually have an active goal.

@@ -124,6 +124,9 @@ async def send_streak_reminder_email(to: str, name: str, streak_days: int, user_
 
 
 async def send_trial_ending_email(to: str, name: str, user_id) -> None:
+    # DORMANT: no caller anymore. Strykd is free, so trial-ending warnings were
+    # removed from the cron job and the Stripe trial_will_end webhook. Retained so
+    # billing/trials can be re-enabled later without rewriting this template.
     first = (name or "there").split(" ")[0]
     body = (
         f'<h1 style="font-size:28px;font-weight:800;margin:16px 0;">'

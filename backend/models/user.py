@@ -28,9 +28,12 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String, nullable=False)
     streak_days: Mapped[int] = mapped_column(Integer, default=0)
     last_checkin: Mapped[date | None] = mapped_column(Date, nullable=True)
-    subscription_active: Mapped[bool] = mapped_column(Boolean, default=False)
+    subscription_active: Mapped[bool] = mapped_column(Boolean, default=False)  # DORMANT: billing kept but not gated; Strykd is free
     page_public: Mapped[bool] = mapped_column(Boolean, default=True)  # public/private page toggle
-    trial_start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # app-side 45-day free trial
+    # DORMANT trial fields. Strykd is free with no expiration, so nothing reads these
+    # for gating anymore (see trial.py). Onboarding still stamps trial_start_date and
+    # the columns are retained so paid trials can be re-enabled later without a migration.
+    trial_start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # dormant (was: app-side trial start)
     avatar_url: Mapped[str | None] = mapped_column(Text, nullable=True)  # base64 data URL or external URL
     bio: Mapped[str | None] = mapped_column(String, nullable=True)  # max 160 chars, shown on public page
     email_reminders: Mapped[bool] = mapped_column(Boolean, default=True)  # master email opt-out (one-click unsubscribe)
@@ -39,7 +42,7 @@ class User(Base):
     timezone: Mapped[str] = mapped_column(String, default="UTC")
     last_reminder_sent: Mapped[date | None] = mapped_column(Date, nullable=True)  # streak reminder dedupe
     last_streak_push_sent: Mapped[date | None] = mapped_column(Date, nullable=True)  # 9pm streak-at-risk push dedupe
-    trial_ending_sent: Mapped[bool] = mapped_column(Boolean, default=False)  # day-6 trial email dedupe
+    trial_ending_sent: Mapped[bool] = mapped_column(Boolean, default=False)  # DORMANT: trial-ending emails removed (Strykd is free)
     last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # last dashboard open
     last_nudge_sent: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # inactivity nudge dedupe
     last_weekly_reflection: Mapped[date | None] = mapped_column(Date, nullable=True)  # Sunday reflection email dedupe

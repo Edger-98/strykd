@@ -167,7 +167,9 @@ export const api = {
     return r.json()
   }),
 
-  // Creates a Stripe Checkout session (45-day trial); returns { checkout_url }
+  // Billing — DORMANT while Strykd is free. No UI calls these anymore (the
+  // dashboard/Settings subscribe + lock UI was removed), but they're kept wired
+  // to the backend so paid plans can be re-enabled without re-plumbing the API.
   checkout: () => req('POST', '/billing/checkout'),
   billingPortal: () => req('POST', '/billing/portal'),
   cancelSubscription: () => req('POST', '/billing/cancel'),
