@@ -16,7 +16,13 @@ _bearer = HTTPBearer()
 
 def _new_token(user_id: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expire_minutes)
-    return jwt.encode({"sub": user_id, "exp": expire}, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+    # type="access" marks this as a session token. Email-action tokens (reset,
+    # unsubscribe) carry their own type and must NOT be accepted as auth — see
+    # the type check in get_current_user.
+    return jwt.encode(
+        {"sub": user_id, "type": "access", "exp": expire},
+        settings.jwt_secret, algorithm=settings.jwt_algorithm,
+    )
 
 
 async def get_current_user(
@@ -37,6 +43,14 @@ async def get_current_user(
         )
         user_id: str | None = payload.get("sub")
         if user_id is None:
+            raise exc
+        # Token-type enforcement: reject email-action tokens (reset / unsubscribe)
+        # being replayed as session credentials. Access tokens are minted with
+        # type="access"; legacy tokens predating this carry no type and are still
+        # accepted so existing sessions don't break. Anything with a non-access
+        # type (reset, unsub, …) is refused.
+        token_type = payload.get("type")
+        if token_type is not None and token_type != "access":
             raise exc
     except JWTError:
         raise exc

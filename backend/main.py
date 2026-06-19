@@ -2,9 +2,13 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from config import settings
 from database import init_db
+from ratelimit import limiter
 from routes.account import router as account_router
 from routes.ai import router as ai_router
 from routes.auth import router as auth_router
@@ -26,6 +30,12 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Strykd API", version="0.1.0", lifespan=lifespan)
+
+# Rate limiting: register the limiter, its 429 handler, and the middleware that
+# enforces per-route @limiter.limit(...) decorators (see ratelimit.py).
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
     CORSMiddleware,

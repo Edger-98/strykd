@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from deps import get_current_user
+from ratelimit import limiter
 from models.encouragement import Encouragement
 from models.goal import Goal
 from models.signal_wall import SignalWall
@@ -464,7 +465,9 @@ class BrainstormRequest(BaseModel):
 
 
 @router.post("/tasks/{task_id}/brainstorm")
+@limiter.limit("20/minute;300/day")
 async def brainstorm(
+    request: Request,
     task_id: str,
     body: BrainstormRequest,
     db: AsyncSession = Depends(get_db),

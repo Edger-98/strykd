@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from jose import jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr
@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config import settings
 from database import get_db
 from models.user import User
+from ratelimit import limiter
 from services.email import send_password_reset_email, send_welcome_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -43,7 +44,12 @@ def _verify_password(plain: str, hashed: str) -> bool:
 
 def _create_token(user_id: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expire_minutes)
-    return jwt.encode({"sub": user_id, "exp": expire}, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+    # type="access": session token. Reset/unsubscribe tokens use a different type
+    # and are rejected by get_current_user so they can't be used as credentials.
+    return jwt.encode(
+        {"sub": user_id, "type": "access", "exp": expire},
+        settings.jwt_secret, algorithm=settings.jwt_algorithm,
+    )
 
 
 def _create_reset_token(user_id: str) -> str:
@@ -55,7 +61,8 @@ def _create_reset_token(user_id: str) -> str:
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/minute;30/hour")
+async def register(request: Request, body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     existing = await db.scalar(select(User).where(User.email == body.email))
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -80,7 +87,8 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/minute;100/hour")
+async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends(get_db)):
     user = await db.scalar(select(User).where(User.email == body.email))
     if not user or not _verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -103,7 +111,8 @@ class ResetPasswordRequest(BaseModel):
 
 
 @router.post("/forgot-password")
-async def forgot_password(body: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("3/minute;15/hour")
+async def forgot_password(request: Request, body: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
     """Send a time-limited reset link. Always returns 200 to avoid leaking which
     emails are registered."""
     user = await db.scalar(select(User).where(User.email == body.email))
@@ -127,7 +136,8 @@ async def validate_reset_token(token: str):
 
 
 @router.post("/reset-password")
-async def reset_password(body: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/minute;30/hour")
+async def reset_password(request: Request, body: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
     try:
         payload = jwt.decode(body.token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
         if payload.get("type") != "reset":

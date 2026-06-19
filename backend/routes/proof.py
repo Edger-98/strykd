@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime, timezone
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,6 +9,7 @@ from database import get_db
 from models.goal import Goal
 from models.task import DailyTask
 from models.user import User
+from ratelimit import limiter
 from services import s3
 from services.cache import bust_public_page
 from services.llm import verify_proof
@@ -62,7 +63,9 @@ async def _owned_task(task_id: str, user: User, db: AsyncSession) -> DailyTask:
 
 
 @router.post("/tasks/{task_id}/proof")
+@limiter.limit("30/minute;300/day")
 async def upload_task_proof(
+    request: Request,
     task_id: str,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
@@ -88,7 +91,9 @@ async def upload_task_proof(
 
 
 @router.post("/goals/{goal_id}/daily-proof")
+@limiter.limit("15/minute;150/day")
 async def upload_daily_proof(
+    request: Request,
     goal_id: str,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),

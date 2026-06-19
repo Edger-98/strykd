@@ -3,7 +3,7 @@ import json
 import logging
 from datetime import date, datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config import settings
 from database import AsyncSessionLocal, get_db
 from deps import get_current_user
+from ratelimit import limiter
 from models.goal import Goal
 from models.signal_wall import SignalWall
 from models.task import DailyTask
@@ -44,7 +45,9 @@ class ClarifyRequest(BaseModel):
 
 
 @router.post("/clarify")
+@limiter.limit("20/minute;200/day")
 async def clarify(
+    request: Request,
     body: ClarifyRequest,
     current_user: User = Depends(get_current_user),
 ):
@@ -63,7 +66,8 @@ class FeasibilityRequest(BaseModel):
 
 
 @router.post("/validate-goal")
-async def validate_goal(body: FeasibilityRequest, current_user: User = Depends(get_current_user)):
+@limiter.limit("20/minute;200/day")
+async def validate_goal(request: Request, body: FeasibilityRequest, current_user: User = Depends(get_current_user)):
     """Check if the chosen duration is realistic for the goal. Never blocks onboarding."""
     try:
         return await assess_feasibility(body.goal, body.duration_days, body.goal_type)
@@ -169,7 +173,9 @@ async def _persist_plan(db: AsyncSession, user: User, body: OnboardingRequest, p
 
 
 @router.post("", response_model=OnboardingResponse)
+@limiter.limit("10/hour;30/day")
 async def onboard(
+    request: Request,
     body: OnboardingRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -246,7 +252,9 @@ async def _generate_remaining_days(goal_id, ctx: dict, start_day: int, end_day: 
 
 
 @router.get("/stream")
+@limiter.limit("10/hour;30/day")
 async def onboard_stream(
+    request: Request,
     goals: str = Query(...),
     duration_days: int = Query(...),
     aesthetic: str = Query(...),

@@ -13,6 +13,7 @@ from database import get_db
 from deps import get_current_user
 from models.shared_list import SharedList, SharedListTask
 from models.user import User
+from ratelimit import limiter
 from services.llm import generate_itinerary
 
 
@@ -23,6 +24,10 @@ def _is_list_owner(request: Request, lst: SharedList) -> bool:
         return False
     try:
         payload = jwt.decode(auth[7:], settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        # Reject reset/unsubscribe tokens replayed as auth (see deps.get_current_user).
+        token_type = payload.get("type")
+        if token_type is not None and token_type != "access":
+            return False
         return str(payload.get("sub")) == str(lst.user_id)
     except JWTError:
         return False
@@ -119,7 +124,8 @@ async def delete_list(code: str, db: AsyncSession = Depends(get_db), current_use
 
 
 @router.post("/shared-lists/{code}/itinerary")
-async def make_itinerary(code: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+@limiter.limit("10/minute;100/day")
+async def make_itinerary(request: Request, code: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     lst = await _owned_list(code, current_user, db)
     res = await db.execute(select(SharedListTask).where(SharedListTask.list_id == lst.id).order_by(SharedListTask.created_at))
     tasks = [t.content for t in res.scalars().all()]

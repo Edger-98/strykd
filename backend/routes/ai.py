@@ -2,7 +2,7 @@ import json
 import uuid
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -13,6 +13,7 @@ from models.goal import Goal
 from models.task import DailyTask
 from models.theme import Theme
 from models.user import User
+from ratelimit import limiter
 from services.cache import bust_public_page
 from services.llm import stream_replan
 from trial import require_active_access
@@ -36,7 +37,9 @@ class ReplanConfirmRequest(BaseModel):
 
 
 @router.post("")
+@limiter.limit("15/minute;200/day")
 async def replan(
+    request: Request,
     body: ReplanRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_access),
