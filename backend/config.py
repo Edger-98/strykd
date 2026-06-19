@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:5173"
     base_domain: str = "strykdapp.com"
     cron_secret: str = "changeme-cron-secret"
+    enable_docs: bool = False  # expose /docs, /redoc, /openapi.json (dev only)
 
     # OneSignal — web push notifications
     onesignal_app_id: str = ""

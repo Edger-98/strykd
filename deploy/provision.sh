@@ -87,6 +87,8 @@ SHELL=/bin/bash
 10 2 * * * root curl -fsS -X POST http://127.0.0.1:8000/cron/nightly -H "X-Cron-Secret: ${CRON_SECRET_VALUE}" >/dev/null 2>&1
 # Streak-risk reminders: hourly at :05 (endpoint self-checks 8pm-in-user-timezone + dedupe)
 5 * * * * root curl -fsS -X POST http://127.0.0.1:8000/cron/streak-reminders -H "X-Cron-Secret: ${CRON_SECRET_VALUE}" >/dev/null 2>&1
+# Postgres backup: daily at 03:30 UTC (gzipped pg_dump, 14-day local rotation)
+30 3 * * * root bash ${APP_DIR}/deploy/backup_db.sh >> /var/log/strykd-backup.log 2>&1
 CRON
   sudo chmod 0644 /etc/cron.d/strykd
   sudo systemctl restart cron

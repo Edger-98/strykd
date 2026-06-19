@@ -29,7 +29,11 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Strykd API", version="0.1.0", lifespan=lifespan)
+# API docs (/docs, /redoc, /openapi.json) are disabled in production to avoid
+# exposing the full API surface; set ENABLE_DOCS=true (dev) to turn them back on.
+_docs = dict(docs_url="/docs", redoc_url="/redoc", openapi_url="/openapi.json") if settings.enable_docs \
+    else dict(docs_url=None, redoc_url=None, openapi_url=None)
+app = FastAPI(title="Strykd API", version="0.1.0", lifespan=lifespan, **_docs)
 
 # Rate limiting: register the limiter, its 429 handler, and the middleware that
 # enforces per-route @limiter.limit(...) decorators (see ratelimit.py).
@@ -37,10 +41,15 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
+# CORS: match the apex + any single-level subdomain via regex (a literal
+# "https://*.domain" string never matched). Auth is bearer-token, not cookies,
+# so credentialed CORS is unnecessary and is disabled.
+_origin_regex = r"https://([a-z0-9-]+\.)?" + settings.base_domain.replace(".", r"\.")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_url, f"https://*.{settings.base_domain}"],
-    allow_credentials=True,
+    allow_origins=[settings.frontend_url],
+    allow_origin_regex=_origin_regex,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["X-New-Token"],
