@@ -80,14 +80,14 @@ async def upload_task_proof(
 
     key = f"proofs/{current_user.id}/{task.task_date.isoformat()}/{task.id}.{ext}"
     try:
-        url = await s3.upload_proof(key, data, content_type)
+        stored_key = await s3.upload_proof(key, data, content_type)
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
 
-    task.proof_url = url
+    task.proof_url = stored_key  # store the S3 key; serve via presigned URL
     await db.commit()
     await bust_public_page(current_user.slug)
-    return {"task_id": str(task.id), "proof_url": url}
+    return {"task_id": str(task.id), "proof_url": s3.presign_get(stored_key)}
 
 
 @router.post("/goals/{goal_id}/daily-proof")
@@ -124,7 +124,7 @@ async def upload_daily_proof(
     data, content_type, ext = await _read_and_validate(file)
     key = f"proofs/{current_user.id}/{today.isoformat()}/{goal.id}-daily.{ext}"
     try:
-        url = await s3.upload_proof(key, data, content_type)
+        stored_key = await s3.upload_proof(key, data, content_type)
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
 
@@ -154,9 +154,9 @@ async def upload_daily_proof(
             goal.streak_days += 1
             goal.last_checkin = today
 
-    # Attach the proof + review to every task for today on this goal
+    # Attach the proof key + review to every task for today on this goal
     for t in today_tasks:
-        t.proof_url = url
+        t.proof_url = stored_key  # store the S3 key; serve via presigned URL
         t.proof_review = review
 
     await db.commit()
@@ -164,7 +164,7 @@ async def upload_daily_proof(
 
     return {
         "goal_id": str(goal.id),
-        "proof_url": url,
+        "proof_url": s3.presign_get(stored_key),
         "review": review,
         "auto_completed": auto_complete,
         "completed_task_ids": completed_ids,

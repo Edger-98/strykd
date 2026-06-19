@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from deps import get_current_user
 from ratelimit import limiter
+from services import s3
 from models.encouragement import Encouragement
 from models.goal import Goal
 from models.signal_wall import SignalWall
@@ -38,7 +39,7 @@ def _task_dict(t: DailyTask, detailed: bool = False) -> dict:
         "task_date": _d(t.task_date),
         "sort_order": t.sort_order,
     }
-    out["proof_url"] = t.proof_url
+    out["proof_url"] = s3.presign_get(t.proof_url)
     out["duration_minutes"] = t.duration_minutes
     if detailed:
         out["goal_id"] = str(t.goal_id) if t.goal_id else None
@@ -89,11 +90,11 @@ async def build_grid(goal: Goal, db: AsyncSession, today: date) -> list[dict]:
             "is_today": d == today,
             "is_past": d < today,
             "is_future": d > today,
-            "proof_url": proof,
+            "proof_url": s3.presign_get(proof),
             "is_video": bool(proof and proof.lower().endswith(".mp4")),
             "tasks": [
                 {"content": t.content, "completed": t.completed,
-                 "voice_style": t.voice_style, "proof_url": t.proof_url,
+                 "voice_style": t.voice_style, "proof_url": s3.presign_get(t.proof_url),
                  "duration_minutes": t.duration_minutes}
                 for t in tasks
             ],
@@ -138,7 +139,7 @@ async def _goal_section(goal: Goal, db: AsyncSession, today: date, detailed: boo
         seen.add(t.proof_url)
         review = t.proof_review or {}
         proofs.append({
-            "proof_url": t.proof_url,
+            "proof_url": s3.presign_get(t.proof_url),
             "date": _d(t.task_date),
             "is_video": t.proof_url.lower().endswith(".mp4"),
             "verified": bool(review.get("verified")) if review else None,
