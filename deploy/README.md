@@ -21,10 +21,15 @@ HTTP-only provisioning (everything except the interactive DNS-01 cert):
 ```sh
 rsync -az --delete -e "ssh -i strykd-key.pem" \
   --exclude .git --exclude node_modules --exclude .venv --exclude dist \
-  --exclude '*.pem' --exclude backend/.env --exclude .claude --exclude __pycache__ \
+  --exclude '*.pem' --exclude .env --exclude .claude --exclude __pycache__ \
   ./ ubuntu@98.84.244.237:/home/ubuntu/strykd/
 
-# backend/.env is written separately (real secrets, FRONTEND_URL=http://98.84.244.237)
+# IMPORTANT: --exclude .env (matches basename at any depth) protects BOTH
+#   backend/.env  (app secrets: DB/Redis URLs, JWT/cron, AWS, Stripe, OneSignal)
+#   ./.env        (compose secrets: POSTGRES_PASSWORD, REDIS_PASSWORD)
+# Never drop it from a --delete rsync or you'll wipe Redis auth / DB creds on the box.
+
+# backend/.env and ./.env are written/maintained separately on the server (real secrets)
 ssh -i strykd-key.pem ubuntu@98.84.244.237 \
   "cd /home/ubuntu/strykd && sudo APP_DIR=/home/ubuntu/strykd PUBLIC_IP=98.84.244.237 bash deploy/provision.sh"
 ```
